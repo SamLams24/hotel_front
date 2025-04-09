@@ -11,6 +11,7 @@ import GererUser from '@/views/GererUser.vue';
 import AcceuilHome from '@/views/AcceuilHome.vue';
 
 const routes = [
+  { path: '/', redirect: '/Home' },
   { path: '/login', component: UserLogin },
   { path: '/register', component: UserRegister },
   { path: '/chambres', component: ChambreList },

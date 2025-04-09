@@ -29,6 +29,23 @@
 
     <p v-else class="text-center text-gray-600">Aucune réservation trouvée.</p>
 
+    <!-- Pagination -->
+    <div v-if="pagination && pagination.lastPage > 1" class="flex justify-center space-x-2 mt-6">
+      <button 
+        v-if="pagination.prevPageUrl" 
+        @click="chargerPage(pagination.prevPageUrl)" 
+        class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">
+        Précédent
+      </button>
+
+      <button 
+        v-if="pagination.nextPageUrl" 
+        @click="chargerPage(pagination.nextPageUrl)" 
+        class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">
+        Suivant
+      </button>
+    </div>
+
     <!-- Modal Modification -->
     <div v-if="showModalModif" class="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
       <div class="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
@@ -76,7 +93,13 @@ export default {
         date_arrive: '',
         date_depart: ''
       },
-      reservationAAnnuler: null
+      reservationAAnnuler: null,
+      pagination: {
+        currentPage: 1,
+        lastPage: 1,
+        nextPageUrl: null,
+        prevPageUrl: null
+      }
     };
   },
   async created() {
@@ -87,7 +110,15 @@ export default {
       }
 
       const response = await axios.get('/reservation');
-      this.reservations = response.data;
+      
+      // Récupérer les réservations et la pagination
+      this.reservations = response.data.data;
+      this.pagination = {
+        currentPage: response.data.current_page,
+        lastPage: response.data.last_page,
+        nextPageUrl: response.data.next_page_url,
+        prevPageUrl: response.data.prev_page_url
+      };
     } catch (error) {
       console.error("Erreur lors de la récupération des réservations :", error);
     }
@@ -144,6 +175,22 @@ export default {
         this.fermerModalAnnulation();
       } catch (error) {
         console.error("Erreur d'annulation :", error);
+      }
+    },
+
+    // Charger une nouvelle page de réservations
+    async chargerPage(url) {
+      try {
+        const response = await axios.get(url);
+        this.reservations = response.data.data;
+        this.pagination = {
+          currentPage: response.data.current_page,
+          lastPage: response.data.last_page,
+          nextPageUrl: response.data.next_page_url,
+          prevPageUrl: response.data.prev_page_url
+        };
+      } catch (error) {
+        console.error("Erreur lors du chargement de la page :", error);
       }
     }
   }
