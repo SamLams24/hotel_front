@@ -1,9 +1,7 @@
 <template>
   <div>
     <!-- Police externe -->
-    <head>
-      <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@400;700&display=swap" rel="stylesheet">
-    </head>
+   
 
     <!-- Image de couverture -->
     <section class="relative">
@@ -99,11 +97,11 @@
 </template>
 
 <script>
+
 export default {
   name: "ContactPage",
 };
 </script>
 
 <style scoped>
-/* Ajoute tes styles personnalisés ici si besoin */
 </style>
