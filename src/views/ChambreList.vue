@@ -107,6 +107,10 @@ export default {
     try {
       const response = await axios.get('/chambre');
       this.chambres = response.data;
+      const roomsData = this.$route.query.rooms;
+    if (roomsData) {
+      this.chambres = JSON.parse(roomsData);
+    }
     } catch (error) {
       console.error("Erreur lors de la récupération des chambres", error);
     }
