@@ -1,5 +1,8 @@
 <template>
+
   <div class="container mx-full px-full py-full">
+ 
+
 
     <HomeView />
 
@@ -37,6 +40,7 @@
 
 
     <!-- Liste des chambres -->
+
 <h2 class="text-center text-3xl text-gray-800 mb-8 mt-12 font-serif">Nos Chambres</h2>
 <div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-6xl mx-6 px-4">
   <div
@@ -121,6 +125,49 @@
           </button>
           <button @click="closeModal" class="bg-gray-300 py-2 px-4 rounded-lg hover:bg-gray-400">
             Annuler
+
+  
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal de réservation -->
+    <div v-if="showModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex justify-center items-center">
+      <div class="bg-white p-6 rounded-lg shadow-lg w-96">
+        <h3 class="text-xl font-semibold mb-4">Réservez votre chambre</h3>
+
+        <label for="phone" class="block mb-2">Numéro de téléphone</label>
+        <input
+          v-model="phoneNumber"
+          id="phone"
+          type="tel"
+          class="w-full p-2 border border-gray-300 rounded-lg mb-4"
+          placeholder="Entrez votre numéro"
+        />
+
+        <label for="dateArrive" class="block mb-2">Date d'arrivée</label>
+        <input
+          v-model="dateArrive"
+          id="dateArrive"
+          type="date"
+          class="w-full p-2 border border-gray-300 rounded-lg mb-4"
+        />
+
+        <label for="dateDepart" class="block mb-2">Date de départ</label>
+        <input
+          v-model="dateDepart"
+          id="dateDepart"
+          type="date"
+          class="w-full p-2 border border-gray-300 rounded-lg mb-4"
+        />
+
+        <div class="flex justify-between mt-4">
+          <button @click="makeReservation" class="bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700">
+            Réserver
+          </button>
+          <button @click="closeModal" class="bg-gray-300 py-2 px-4 rounded-lg hover:bg-gray-400">
+            Annuler
           </button>
         </div>
       </div>
@@ -134,6 +181,7 @@ import HomeView from './HomeView.vue';
 import flatpickr from 'flatpickr';
 import 'flatpickr/dist/l10n/fr'; 
 import 'flatpickr/dist/flatpickr.min.css';
+
 
 export default {
   components: {
@@ -153,10 +201,15 @@ export default {
     try {
       const response = await axios.get('/chambre');
       this.chambres = response.data;
+      const roomsData = this.$route.query.rooms;
+    if (roomsData) {
+      this.chambres = JSON.parse(roomsData);
+    }
     } catch (error) {
       console.error("Erreur lors de la récupération des chambres", error);
     }
   },
+
 
 
   mounted() {
@@ -194,6 +247,8 @@ flatpickr(this.$refs.checkinInput, {
       console.log('Recherche pour:', this.checkinDate, 'au', this.checkoutDate);
     }, 
     
+  methods: {
+
     // Ouvrir le modal de réservation
     openModal(chambreId) {
       this.selectedChambreId = chambreId;

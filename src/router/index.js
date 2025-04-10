@@ -14,7 +14,7 @@ const routes = [
   { path: '/', redirect: '/Home' },
   { path: '/login', component: UserLogin },
   { path: '/register', component: UserRegister },
-  { path: '/chambres', component: ChambreList },
+  { path: '/chambres', component: ChambreList ,name:'chambres'},
   { path: '/reservations', component: ReservationList },
   { path: '/contact', component: ContactList },
   { path: '/Home', component: AcceuilHome },

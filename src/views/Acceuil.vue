@@ -13,6 +13,7 @@
             <input 
               type="text" 
               id="checkin-date" 
+              v-model="checkinDate"
               ref="checkinInput"
               class="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-transparent font-serif"
               placeholder="Date d'arrivée">
@@ -23,6 +24,7 @@
             <input 
               type="text" 
               id="checkout-date" 
+              v-model="checkoutDate"
               ref="checkoutInput"
               class="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-transparent font-serif"
               placeholder="Date de départ">
@@ -266,6 +268,7 @@
   </template>
   
   <script>
+import axios from 'axios';  
 import flatpickr from 'flatpickr';
 import 'flatpickr/dist/l10n/fr'; 
 import 'flatpickr/dist/flatpickr.min.css';
@@ -315,12 +318,32 @@ import 'flatpickr/dist/flatpickr.min.css';
   },
 
   methods: {
-    searchRooms() {
-      if (!this.checkinDate || !this.checkoutDate) {
-        alert('Veuillez sélectionner les dates de séjour');
-        return;
+    
+    async searchRooms() {
+    function convertToDateFormat(date) {
+    const [day, month, year] = date.split('/');
+    return `${year}-${month}-${day}`;
+  }
+      try {
+        
+
+        const response = await axios.post('/search_chambres', {
+          start_date:convertToDateFormat( this.checkinDate),
+          end_date: convertToDateFormat(this.checkoutDate)
+        });
+      this.rooms = response.data;
+
+      this.$router.push({
+      name: 'chambres', 
+      query: {
+        rooms: JSON.stringify(this.rooms)
+
       }
-      console.log('Recherche pour:', this.checkinDate, 'au', this.checkoutDate);
+    });
+      } catch (error) {
+        console.error("Erreur lors de la recherche :", error);
+        alert("Erreur lors de la recherche de chambres.");
+      }
     },
     nextImage() {
       this.currentImage = (this.currentImage + 1) % this.images.length;

@@ -20,6 +20,9 @@ importers:
       flatpickr:
         specifier: ^4.6.13
         version: 4.6.13
+      pnpm:
+        specifier: ^10.8.0
+        version: 10.8.0
       vue:
         specifier: ^3.2.13
         version: 3.5.13
@@ -2840,6 +2843,11 @@ packages:
   pkg-dir@4.2.0:
     resolution: {integrity: sha512-HRDzbaKjC+AOWVXxAU/x54COGeIv9eb+6CkDSQoNTt4XyWoIJvuPsXizxu/Fr23EiekbtZwmh1IcIG/l/a10GQ==}
     engines: {node: '>=8'}
+
+  pnpm@10.8.0:
+    resolution: {integrity: sha512-DoJxTRtbQ8dGEBk8sgc0iXwdAN6J0OGEIK68WXf6E9eAqcsFc0Yk6B69gcyHbNRkeUhQZBxIuVRDJrViLKKZcQ==}
+    engines: {node: '>=18.12'}
+    hasBin: true
 
   portfinder@1.0.35:
     resolution: {integrity: sha512-73JaFg4NwYNAufDtS5FsFu/PdM49ahJrO1i44aCRsDWju1z5wuGDaqyFUQWR6aJoK2JPDWlaYYAGFNIGTSUHSw==}
@@ -6969,6 +6977,8 @@ snapshots:
   pkg-dir@4.2.0:
     dependencies:
       find-up: 4.1.0
+
+  pnpm@10.8.0: {}
 
   portfinder@1.0.35:
     dependencies:

@@ -113,6 +113,23 @@
       </button>
     </div>
 
+    <!-- Pagination -->
+    <div v-if="pagination && pagination.lastPage > 1" class="flex justify-center space-x-2 mt-6">
+      <button 
+        v-if="pagination.prevPageUrl" 
+        @click="chargerPage(pagination.prevPageUrl)" 
+        class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">
+        Précédent
+      </button>
+
+      <button 
+        v-if="pagination.nextPageUrl" 
+        @click="chargerPage(pagination.nextPageUrl)" 
+        class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">
+        Suivant
+      </button>
+    </div>
+
     <!-- Modal Modification -->
     <div v-if="showModalModif" class="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
       <div class="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
@@ -165,8 +182,10 @@ export default {
         date_depart: ''
       },
       reservationAAnnuler: null,
+
       checkinDate: null,
       checkoutDate: null,
+
       pagination: {
         currentPage: 1,
         lastPage: 1,
