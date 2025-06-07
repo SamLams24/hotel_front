@@ -9,6 +9,7 @@ import GererChambre from '@/views/GererChambre.vue';
 import GererReservation from '@/views/GererReservation.vue';
 import GererUser from '@/views/GererUser.vue';
 import AcceuilHome from '@/views/AcceuilHome.vue';
+import GererBar from '@/views/GererBar.vue';
 
 const routes = [
   { path: '/', redirect: '/Home' },
@@ -22,6 +23,8 @@ const routes = [
   { path: '/adminChambres', component: GererChambre },
   { path: '/adminReservations', component: GererReservation },
   { path: '/adminUsers', component: GererUser },
+  { path: '/adminBar', component: GererBar },  
+
 
 ];
 

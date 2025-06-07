@@ -174,14 +174,12 @@
     </div>
   </div>
 </template>
-
 <script>
 import axios from 'axios';
 import HomeView from './HomeView.vue';
 import flatpickr from 'flatpickr';
-import 'flatpickr/dist/l10n/fr'; 
+import 'flatpickr/dist/l10n/fr';
 import 'flatpickr/dist/flatpickr.min.css';
-
 
 export default {
   components: {
@@ -194,107 +192,94 @@ export default {
       dateArrive: '',
       dateDepart: '',
       showModal: false,
-      selectedChambreId: null
+      selectedChambreId: null,
+      checkinDate: '',
+      checkoutDate: ''
     };
   },
   async created() {
     try {
       const response = await axios.get('/chambre');
       this.chambres = response.data;
+
       const roomsData = this.$route.query.rooms;
-    if (roomsData) {
-      this.chambres = JSON.parse(roomsData);
-    }
+      if (roomsData) {
+        this.chambres = JSON.parse(roomsData);
+      }
     } catch (error) {
       console.error("Erreur lors de la récupération des chambres", error);
     }
   },
-
-
-
   mounted() {
+    const checkoutPicker = flatpickr(this.$refs.checkoutInput, {
+      locale: 'fr',
+      minDate: new Date().fp_incr(1),
+      dateFormat: 'd/m/Y',
+      onChange: (selectedDates, dateStr) => {
+        this.checkoutDate = dateStr;
+      }
+    });
 
-const checkoutPicker = flatpickr(this.$refs.checkoutInput, {
-  locale: 'fr',
-  minDate: new Date().fp_incr(1),
-  dateFormat: 'd/m/Y',
-  onChange: (selectedDates, dateStr) => {
-    this.checkoutDate = dateStr;
-  }
-
- 
-});
-
-flatpickr(this.$refs.checkinInput, {
-  locale: 'fr',
-  minDate: 'today',
-  dateFormat: 'd/m/Y',
-  onChange: (selectedDates, dateStr) => {
-    this.checkinDate = dateStr;
-    checkoutPicker.set('minDate', selectedDates[0].fp_incr(1));
-  }
-});
-},
-
-
+    flatpickr(this.$refs.checkinInput, {
+      locale: 'fr',
+      minDate: 'today',
+      dateFormat: 'd/m/Y',
+      onChange: (selectedDates, dateStr) => {
+        this.checkinDate = dateStr;
+        checkoutPicker.set('minDate', selectedDates[0].fp_incr(1));
+      }
+    });
+  },
   methods: {
-
     searchRooms() {
       if (!this.checkinDate || !this.checkoutDate) {
         alert('Veuillez sélectionner les dates de séjour');
         return;
       }
       console.log('Recherche pour:', this.checkinDate, 'au', this.checkoutDate);
-    }, 
-    
-  methods: {
-
-    // Ouvrir le modal de réservation
+    },
     openModal(chambreId) {
       this.selectedChambreId = chambreId;
       this.showModal = true;
     },
-    // Fermer le modal
     closeModal() {
       this.showModal = false;
       this.phoneNumber = '';
       this.dateArrive = '';
       this.dateDepart = '';
     },
-    // Fonction pour effectuer la réservation avec les informations nécessaires
     async makeReservation() {
-  if (!this.phoneNumber || !this.dateArrive || !this.dateDepart) {
-    alert('Veuillez remplir tous les champs.');
-    return;
-  }
+      if (!this.phoneNumber || !this.dateArrive || !this.dateDepart) {
+        alert('Veuillez remplir tous les champs.');
+        return;
+      }
 
-  try {
-    // Appel à Laravel pour créer une réservation et obtenir l'URL de paiement
-    const response = await axios.post(`/reservation`, {
-      user_id: 1, // Remplace par l'ID dynamique plus tard
-      chambre_id: this.selectedChambreId,
-      date_arrive: this.dateArrive,
-      date_depart: this.dateDepart,
-      phone_number: this.phoneNumber
-    });
+      try {
+        const response = await axios.post(`/reservation`, {
+          user_id: 1, // Remplacer plus tard par ID dynamique
+          chambre_id: this.selectedChambreId,
+          date_arrive: this.dateArrive,
+          date_depart: this.dateDepart,
+          phone_number: this.phoneNumber
+        });
 
-    const paymentUrl = response.data.redirect_url;
+        const paymentUrl = response.data.redirect_url;
 
-    if (paymentUrl) {
-      this.closeModal(); // Ferme le modal
-      window.location.href = paymentUrl; // Redirige vers la page de paiement FedaPay
-    } else {
-      alert("Impossible de récupérer l'URL de paiement.");
+        if (paymentUrl) {
+          this.closeModal();
+          window.location.href = paymentUrl;
+        } else {
+          alert("Impossible de récupérer l'URL de paiement.");
+        }
+      } catch (error) {
+        console.error('Erreur lors de la réservation :', error);
+        alert('Une erreur est survenue, veuillez réessayer.');
+      }
     }
-  } catch (error) {
-    console.error('Erreur lors de la réservation :', error);
-    alert('Une erreur est survenue, veuillez réessayer.');
-  }
-}
-
   }
 };
 </script>
+
 
 <style scoped>
 .container {
