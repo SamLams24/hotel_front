@@ -12,7 +12,6 @@ axios.defaults.withCredentials = true;
 const app = createApp(App);
 app.use(router);
 app.config.globalProperties.$axios = axios;
-app.mount('#app');
 
 
 axios.interceptors.request.use(
@@ -41,3 +40,5 @@ app.use(Toast, {
   icon: true,
   rtl: false
 });
+
+app.mount('#app');

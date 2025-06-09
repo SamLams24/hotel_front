@@ -74,6 +74,26 @@
                 required
               />
             </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+              <textarea
+                v-model="formData.description"
+                rows="3"
+                placeholder="Décrivez la chambre..."
+                class="input"
+              ></textarea>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Disponibilité</label>
+              <select
+                v-model="formData.disponibilite"
+                class="input"
+                required
+              >
+                <option value="1">Disponible</option>
+                <option value="0">Non disponible</option>
+              </select>
+            </div>
 
             <div class="md:col-span-2">
               <label class="block text-sm font-medium text-gray-700 mb-2">Photo de la chambre</label>
@@ -95,7 +115,7 @@
                 </div>
                 <div v-else class="relative w-full max-w-md">
                   <img
-                    :src="formData.photo"
+                    :src="getImageUrl(formData.photo)"
                     class="max-h-64 w-full object-cover rounded-md"
                     alt="Aperçu de la chambre"
                   />
@@ -137,8 +157,11 @@
           v-for="chambre in filteredChambres"
           :key="chambre.id"
           class="bg-white rounded-xl shadow-md overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-1"
-        >
-          <div class="relative">
+        ><span class="absolute top-3 left-3 px-2 py-1 text-xs font-bold rounded-full z-10"
+          :class="chambre.disponibilite == '1' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'">
+          {{ chambre.disponibilite == '1' ? 'Disponible' : 'Occupée' }}
+          </span>
+              <div class="relative">
             <img
               :src="getImageUrl(chambre.photo)"
               class="w-full h-48 object-cover"
@@ -241,7 +264,10 @@ export default {
         numero_chambre: "",
         type: "",
         prix_nuite: "",
-        photo: ""
+        photo: "",
+        description: "",
+        disponibilite: "1"
+
       }
     };
   },
@@ -249,22 +275,37 @@ export default {
     filteredChambres() {
       const query = this.searchQuery.toLowerCase();
       return this.chambres.filter(chambre => 
-        chambre.numero_chambre.toLowerCase().includes(query) ||
+        String(chambre.numero_chambre).includes(query) ||
         chambre.type.toLowerCase().includes(query) ||
         chambre.prix_nuite.toString().includes(query)
-    );
+      );
     }
   },
   created() {
     this.getChambres();
   },
   methods: {
+    getApiBaseUrl() {
+      return process.env.VUE_APP_API_URL || 'http://localhost:8000/api';
+    },
+    
+    getAuthHeader() {
+      const token = localStorage.getItem('token');
+      return {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      };
+    },
+    
     async getChambres() {
       try {
-        const response = await axios.get("/api/chambres");
-        this.chambres = response.data;
+        const response = await axios.get(`${this.getApiBaseUrl()}/chambres`, {
+          headers: this.getAuthHeader()
+        });
+        this.chambres = response.data.chambres;
       } catch (error) {
         console.error("Erreur lors de la récupération des chambres", error);
+        this.$toast.error(error.response?.data?.message || "Erreur lors de la récupération des chambres");
       }
     },
     
@@ -282,7 +323,7 @@ export default {
     },
     
     cancelForm() {
-      this.formData = { numero_chambre: "", type: "", prix_nuite: "", photo: "" };
+      this.formData = { numero_chambre: "", type: "", prix_nuite: "",description: "", photo: "" };
       this.selectedFile = null;
       this.editingChambre = null;
       if (this.$refs.fileInput) this.$refs.fileInput.value = "";
@@ -292,24 +333,21 @@ export default {
       const file = event.target.files[0];
       if (!file) return;
 
-      // Vérification du type de fichier
       if (!file.type.match('image.*')) {
-        alert('Veuillez sélectionner une image valide (JPG, PNG)');
+        this.$toast.error("Veuillez sélectionner une image valide (JPG, PNG)");
         return;
       }
 
-      // Vérification de la taille (max 2MB)
       if (file.size > 2 * 1024 * 1024) {
-        alert('La taille de l\'image ne doit pas dépasser 2MB');
+        this.$toast.error("La taille de l'image ne doit pas dépasser 2MB");
         return;
       }
 
       this.selectedFile = file;
       
-      // Convertir en base64 pour prévisualisation
       const reader = new FileReader();
       reader.onload = (e) => {
-        this.formData.photo = e.target.result; // Stocke en base64
+        this.formData.photo = e.target.result;
       };
       reader.readAsDataURL(file);
     },
@@ -322,7 +360,7 @@ export default {
 
     getImageUrl(photo) {
       if (!photo) return 'https://via.placeholder.com/400x300?text=Chambre';
-      return photo; // Retourne directement le base64 ou l'URL existante
+      return `http://localhost:8000/storage/${photo}`;
     },
 
     async submitChambre() {
@@ -330,41 +368,40 @@ export default {
       try {
         const formData = new FormData();
         
-        // Ajouter les données du formulaire
         formData.append('numero_chambre', this.formData.numero_chambre);
         formData.append('type', this.formData.type);
         formData.append('prix_nuite', this.formData.prix_nuite);
+        formData.append('disponibilite', this.formData.disponibilite);
+        formData.append('description', this.formData.description);
+
         
-        // Gestion de la photo
         if (this.selectedFile) {
-          // Si nouvelle image sélectionnée
           formData.append('photo', this.selectedFile);
         } else if (this.editingChambre && this.formData.photo) {
-          // Si en mode édition et photo existante
           if (this.formData.photo.startsWith('data:')) {
-            // Si c'est un base64, le convertir en Blob
             const blob = await fetch(this.formData.photo).then(r => r.blob());
             formData.append('photo', blob, 'photo.jpg');
           } else {
-            // Si c'est une URL existante, l'envoyer telle quelle
             formData.append('photo', this.formData.photo);
           }
         }
 
         let response;
         if (this.editingChambre) {
-          response = await axios.put(`/api/chambres/${this.editingChambre}`, formData, {
+          response = await axios.put(`${this.getApiBaseUrl()}/chambre/${this.editingChambre}`, formData, {
             headers: {
-              'Content-Type': 'multipart/form-data'
+              'Content-Type': 'multipart/form-data',
+              'Authorization': this.getAuthHeader().Authorization
             }
           });
           this.chambres = this.chambres.map(c => 
             c.id === this.editingChambre ? response.data : c
           );
         } else {
-          response = await axios.post("/api/chambres", formData, {
+          response = await axios.post(`${this.getApiBaseUrl()}/chambre`, formData, {
             headers: {
-              'Content-Type': 'multipart/form-data'
+              'Content-Type': 'multipart/form-data',
+              'Authorization': this.getAuthHeader().Authorization
             }
           });
           this.chambres.push(response.data);
@@ -372,9 +409,10 @@ export default {
         
         this.showForm = false;
         this.cancelForm();
+        this.$toast.success(`Chambre ${this.editingChambre ? 'modifiée' : 'ajoutée'} avec succès`);
       } catch (error) {
         console.error("Erreur lors de l'enregistrement", error);
-        alert("Une erreur est survenue lors de l'enregistrement");
+        this.$toast.error(error.response?.data?.message || "Une erreur est survenue lors de l'enregistrement");
       } finally {
         this.isSubmitting = false;
       }
@@ -387,11 +425,15 @@ export default {
     
     async deleteChambre() {
       try {
-        await axios.delete(`/api/chambres/${this.chambreToDelete}`);
+        await axios.delete(`${this.getApiBaseUrl()}/chambre/${this.chambreToDelete}`, {
+          headers: this.getAuthHeader()
+        });
         this.chambres = this.chambres.filter(c => c.id !== this.chambreToDelete);
         this.showDeleteModal = false;
+        this.$toast.success("Chambre supprimée avec succès");
       } catch (error) {
         console.error("Erreur lors de la suppression", error);
+        this.$toast.error(error.response?.data?.message || "Erreur lors de la suppression");
       }
     },
     

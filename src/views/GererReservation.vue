@@ -15,40 +15,45 @@
         
         <form @submit.prevent="submitReservation" class="space-y-4">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Numéro Réservation</label>
-              <input v-model="formData.numero_reservation" type="text" required
-                     class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-            </div>
             
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Chambre</label>
-              <input v-model="formData.chambre_id" type="text" required
+              <select v-model="formData.chambre_id" required
                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option v-for="chambre in chambres" :key="chambre.id" :value="chambre.id">
+                  Chambre {{ chambre.numero_chambre }} ({{ chambre.type }})
+                </option>
+              </select>
             </div>
             
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Utilisateur</label>
-              <input v-model="formData.user_id" type="text" required
+              <select v-model="formData.user_id" required
                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option v-for="user in users" :key="user.id" :value="user.id">
+                  {{ user.name }} ({{ user.email }})
+                </option>
+              </select>
             </div>
             
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Date Arrivée</label>
               <input v-model="formData.date_arrive" type="date" required
+                     @change="calculateDuration"
                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
             </div>
             
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Date Départ</label>
               <input v-model="formData.date_depart" type="date" required
+                     @change="calculateDuration"
                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
             </div>
             
-            <div>
+            <div v-if="durationDays > 0">
               <label class="block text-sm font-medium text-gray-700 mb-1">Durée (jours)</label>
-              <input v-model="formData.dure_reservation" type="number" required
-                     class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <input :value="durationDays" type="number" disabled
+                     class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100">
             </div>
           </div>
 
@@ -92,20 +97,21 @@
               <div class="space-y-2">
                 <p class="font-medium">
                   <span class="text-blue-600">#{{ reservation.numero_reservation }}</span> - 
-                  Chambre {{ reservation.chambre_id }}
+                  Chambre {{ getChambreNumber(reservation.chambre_id) }}
                 </p>
                 <p class="text-sm text-gray-600">
-                  <span class="font-medium">Client:</span> {{ reservation.user_id }}
+                  <span class="font-medium">Client:</span> {{ getUserName(reservation.user_id) }}
                 </p>
                 <p class="text-sm text-gray-600">
                   <span class="font-medium">Période:</span> 
                   {{ formatDate(reservation.date_arrive) }} → {{ formatDate(reservation.date_depart) }}
+                  <span class="ml-2 px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">
+                    {{ calculateDays(reservation.date_arrive, reservation.date_depart) }} jours
+                  </span>
                 </p>
                 <p class="text-sm text-gray-600">
-                  <span class="font-medium">Durée:</span> 
-                  <span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">
-                    {{ reservation.dure_reservation }} jours
-                  </span>
+                  <span class="font-medium">Date réservation:</span> 
+                  {{ formatDateTime(reservation.created_at) }}
                 </p>
               </div>
               
@@ -161,18 +167,19 @@ export default {
   data() {
     return {
       reservations: [],
+      chambres: [],
+      users: [],
       searchQuery: '',
       showForm: false,
       editingReservation: null,
       showDeleteModal: false,
       reservationToDelete: null,
+      durationDays: 0,
       formData: {
-        numero_reservation: '',
         chambre_id: '',
         user_id: '',
         date_arrive: '',
         date_depart: '',
-        dure_reservation: ''
       }
     };
   },
@@ -182,23 +189,53 @@ export default {
         const search = this.searchQuery.toLowerCase();
         return (
           reservation.numero_reservation.toLowerCase().includes(search) ||
-          reservation.chambre_id.toString().includes(search) ||
-          reservation.user_id.toString().includes(search)
+          this.getChambreNumber(reservation.chambre_id).toString().includes(search) ||
+          this.getUserName(reservation.user_id).toLowerCase().includes(search)
         );
       });
     }
   },
-  created() {
-    this.getReservations();
+  async created() {
+    await this.getReservations();
+    await this.getChambres();
+    await this.getUsers();
   },
   methods: {
     async getReservations() {
       try {
-        const response = await axios.get('/api/reservations');
-        this.reservations = response.data;
+        const response = await axios.get('/reservations');
+        this.reservations = response.data.data || response.data;
       } catch (error) {
         console.error("Erreur lors de la récupération des réservations", error);
       }
+    },
+    
+    async getChambres() {
+      try {
+        const response = await axios.get('/chambres');
+        this.chambres = response.data.chambres || response.data;
+      } catch (error) {
+        console.error("Erreur lors de la récupération des chambres", error);
+      }
+    },
+    
+    async getUsers() {
+      try {
+        const response = await axios.get('/users');
+        this.users = response.data;
+      } catch (error) {
+        console.error("Erreur lors de la récupération des utilisateurs", error);
+      }
+    },
+    
+    getChambreNumber(chambreId) {
+      const chambre = this.chambres.find(c => c.id === chambreId);
+      return chambre ? chambre.numero_chambre : 'N/A';
+    },
+    
+    getUserName(userId) {
+      const user = this.users.find(u => u.id === userId);
+      return user ? user.name : 'N/A';
     },
     
     showAddForm() {
@@ -210,6 +247,7 @@ export default {
     editReservation(reservation) {
       this.formData = { ...reservation };
       this.editingReservation = reservation.id;
+      this.durationDays = this.calculateDays(reservation.date_arrive, reservation.date_depart);
       this.showForm = true;
     },
     
@@ -220,27 +258,39 @@ export default {
     
     resetForm() {
       this.formData = {
-        numero_reservation: '',
         chambre_id: '',
         user_id: '',
         date_arrive: '',
         date_depart: '',
-        dure_reservation: ''
       };
+      this.durationDays = 0;
+    },
+    
+    calculateDuration() {
+      if (this.formData.date_arrive && this.formData.date_depart) {
+        this.durationDays = this.calculateDays(this.formData.date_arrive, this.formData.date_depart);
+      }
+    },
+    
+    calculateDays(startDate, endDate) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      const diffTime = end - start;
+      return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     },
     
     async submitReservation() {
       try {
+        const reservationData = { ...this.formData };
+        
         if (this.editingReservation) {
-          // Mise à jour avec PUT
-          await axios.put(`/api/reservations/${this.editingReservation}`, this.formData);
+          await axios.put(`/reservation/${this.editingReservation}`, reservationData);
           const index = this.reservations.findIndex(r => r.id === this.editingReservation);
           if (index !== -1) {
-            this.reservations[index] = { ...this.formData, id: this.editingReservation };
+            this.reservations[index] = { ...reservationData, id: this.editingReservation };
           }
         } else {
-          // Création avec POST
-          const response = await axios.post('/api/reservations', this.formData);
+          const response = await axios.post('/reservation', reservationData);
           this.reservations.push(response.data);
         }
         
@@ -258,7 +308,7 @@ export default {
     
     async deleteReservation() {
       try {
-        await axios.delete(`/api/reservations/${this.reservationToDelete}`);
+        await axios.delete(`/reservation/${this.reservationToDelete}`);
         this.reservations = this.reservations.filter(r => r.id !== this.reservationToDelete);
         this.showDeleteModal = false;
       } catch (error) {
@@ -267,20 +317,31 @@ export default {
     },
     
     formatDate(dateString) {
+      if (!dateString) return 'N/A';
       const options = { year: 'numeric', month: 'short', day: 'numeric' };
       return new Date(dateString).toLocaleDateString('fr-FR', options);
+    },
+    
+    formatDateTime(dateTimeString) {
+      if (!dateTimeString) return 'N/A';
+      const options = { 
+        year: 'numeric', 
+        month: 'short', 
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      };
+      return new Date(dateTimeString).toLocaleDateString('fr-FR', options);
     }
   }
 };
 </script>
 
 <style scoped>
-/* Animation pour les transitions */
 .transition {
   transition: all 0.2s ease-in-out;
 }
 
-/* Style pour les boutons */
 button {
   transition: transform 0.1s ease;
 }
@@ -289,7 +350,6 @@ button:active {
   transform: scale(0.98);
 }
 
-/* Style pour les cartes de réservation */
 .hover\:bg-gray-50:hover {
   background-color: rgba(249, 250, 251, 1);
 }

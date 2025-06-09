@@ -173,7 +173,7 @@
           >
             <div class="relative h-48 bg-gray-200">
               <img
-                :src="item.image || 'https://via.placeholder.com/300x200?text=Bar'"
+                :src="'http://localhost:8000'+'/storage/'+item.image || 'https://via.placeholder.com/300x200?text=Bar'"
                 class="w-full h-full object-cover"
                 :alt="item.name"
               />
@@ -397,7 +397,7 @@
                     </div>
                     <div v-else class="relative w-full max-w-md">
                       <img
-                        :src="itemForm.image"
+                        :src="'http://localhost:8000'+'/storage/'+itemForm.image"
                         class="max-h-48 w-full object-cover rounded-md"
                         alt="Aperçu de l'article"
                       />
@@ -452,7 +452,7 @@
                   <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Numéro de chambre (optionnel)</label>
                     <input
-                      v-model="orderForm.roomNumber"
+                      v-model="orderForm.room_number"
                       type="number"
                       min="0"
                       class="input"
@@ -801,6 +801,9 @@ export default {
         }
         
         if (this.editingItem) {
+          for (let pair of formData.entries()) {
+        console.log(pair[0] + ': ' + pair[1]);
+    }
           await axios.put(
             `${this.getApiBaseUrl()}/menu-items/${this.editingItem}`,
             formData,
@@ -811,6 +814,7 @@ export default {
               }
             }
           );
+
           this.$toast.success("Article mis à jour");
         } else {
           await axios.post(
@@ -830,7 +834,7 @@ export default {
         this.closeItemForm();
       } catch (error) {
         console.error("Erreur lors de l'enregistrement:", error);
-        this.$toast.error(error.response?.data?.message || "Erreur lors de l'enregistrement");
+        this.$toast.error(error?.response?.data?.message || "Erreur lors de l'enregistrement");
       } finally {
         this.isSubmittingItem = false;
       }
@@ -935,12 +939,13 @@ export default {
         ]
       };
     },
-    
+/* eslint-disable */
     // Impression de facture
  printInvoice(order) {
       const printWindow = window.open('', '_blank');
       
       // Préparer le contenu HTML
+      
       const htmlContent = `
         <!DOCTYPE html>
         <html>
@@ -1000,12 +1005,12 @@ export default {
                 window.close();
               }, 200);
             }
-          </script>
+          <\/script>
         </body>
         </html>
       `;
 
-      // Écrire le contenu dans la nouvelle fenêtre
+    // Écrire le contenu dans la nouvelle fenêtre
       printWindow.document.open();
       printWindow.document.write(htmlContent);
       printWindow.document.close();

@@ -255,7 +255,7 @@ export default {
   methods: {
     async getUsers() {
       try {
-        const response = await axios.get('/api/users');
+        const response = await axios.get('/users');
         this.users = response.data;
       } catch (error) {
         console.error("Erreur lors de la récupération des utilisateurs", error);
@@ -302,13 +302,13 @@ export default {
           const payload = { ...this.formData };
           if (!payload.password) delete payload.password;
           
-          await axios.put(`/api/users/${this.editingUser}`, payload);
+          await axios.put(`/users/${this.editingUser}`, payload);
           this.users = this.users.map(u => 
             u.id === this.editingUser ? { ...u, ...payload } : u
           );
         } else {
           // Création avec POST
-          const response = await axios.post('/api/users', this.formData);
+          const response = await axios.post('/users', this.formData);
           this.users.push(response.data);
         }
         
@@ -326,7 +326,7 @@ export default {
     
     async deleteUser() {
       try {
-        await axios.delete(`/api/users/${this.userToDelete}`);
+        await axios.delete(`/users/${this.userToDelete}`);
         this.users = this.users.filter(u => u.id !== this.userToDelete);
         this.showDeleteModal = false;
       } catch (error) {
