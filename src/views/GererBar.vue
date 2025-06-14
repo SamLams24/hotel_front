@@ -56,7 +56,7 @@
               <div class="flex justify-between items-start">
                 <div>
                   <h3 class="font-bold text-gray-800">Commande #{{ order.id }}</h3>
-                  <p class="text-sm text-gray-500">{{ order.roomNumber ? 'Chambre ' + order.roomNumber : 'Client non résident' }}</p>
+                  <p class="text-sm text-gray-500">Chambre {{ order.room_number }}</p>
                 </div>
                 <span :class="{
                   'bg-yellow-100 text-yellow-800': order.status === 'pending',
@@ -68,7 +68,7 @@
                 </span>
               </div>
               <p class="text-sm text-gray-500 mt-2">
-                {{ formatDate(order.createdAt) }}
+                {{ formatDate(order.created_at) }}
               </p>
             </div>
 
@@ -76,12 +76,12 @@
               <h4 class="font-medium text-gray-700 mb-3">Articles commandés:</h4>
               <ul class="space-y-3">
                 <li 
-                  v-for="(item, index) in order.items" 
+                  v-for="(item, index) in order.order_items" 
                   :key="index"
                   class="flex justify-between"
                 >
-                  <span class="text-gray-600">{{ item.quantity }}x {{ item.name }}</span>
-                  <span class="font-medium">{{ formatPrice(item.price * item.quantity) }} FCFA</span>
+                  <span class="text-gray-600">{{ item.quantity }}x {{ item.menu_item.name }}</span>
+                  <span class="font-medium">{{ formatPrice(item.unit_price * item.quantity) }} FCFA</span>
                 </li>
               </ul>
 
@@ -173,7 +173,7 @@
           >
             <div class="relative h-48 bg-gray-200">
               <img
-                :src="'http://localhost:8000'+'/storage/'+item.image || 'https://via.placeholder.com/300x200?text=Bar'"
+                :src="item.image ? getImageUrl(item.image) : 'https://via.placeholder.com/300x200?text=Bar'"
                 class="w-full h-full object-cover"
                 :alt="item.name"
               />
@@ -331,12 +331,12 @@
                   <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Catégorie</label>
                     <select
-                      v-model="itemForm.category"
+                      v-model="itemForm.category_id"
                       class="input"
                       required
                     >
                       <option value="">Sélectionnez une catégorie</option>
-                      <option v-for="category in categories" :key="category.id" :value="category.name">
+                      <option v-for="category in categories" :key="category.id" :value="category.id">
                         {{ category.name }}
                       </option>
                     </select>
@@ -390,14 +390,14 @@
                       accept="image/*"
                       class="hidden"
                     >
-                    <div v-if="!itemForm.image" class="text-center">
+                    <div v-if="!itemForm.image && !itemImagePreview" class="text-center">
                       <span class="text-5xl mb-2 block">🖼️</span>
                       <p class="text-gray-500">Cliquez pour sélectionner une image</p>
                       <p class="text-sm text-gray-400 mt-2">Formats acceptés: JPG, PNG (max 2MB)</p>
                     </div>
                     <div v-else class="relative w-full max-w-md">
                       <img
-                        :src="'http://localhost:8000'+'/storage/'+itemForm.image"
+                        :src="itemImagePreview || getImageUrl(itemForm.image)"
                         class="max-h-48 w-full object-cover rounded-md"
                         alt="Aperçu de l'article"
                       />
@@ -450,13 +450,14 @@
               <form @submit.prevent="submitOrderForm" class="space-y-4">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Numéro de chambre (optionnel)</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Numéro de chambre</label>
                     <input
                       v-model="orderForm.room_number"
                       type="number"
                       min="0"
                       class="input"
-                      placeholder="Laisser vide si client non résident"
+                      required
+                      placeholder="Entrez le numéro de chambre"
                     />
                   </div>
 
@@ -480,13 +481,13 @@
                       <div class="flex-1">
                         <label class="block text-sm font-medium text-gray-700 mb-1">Article</label>
                         <select
-                          v-model="item.menuItemId"
+                          v-model="item.menu_item_id"
                           class="input"
                           required
                           @change="updateSelectedItem(index)"
                         >
                           <option value="">Sélectionnez un article</option>
-                          <option v-for="menuItem in menuItems" :key="menuItem.id" :value="menuItem.id">
+                          <option v-for="menuItem in availableMenuItems" :key="menuItem.id" :value="menuItem.id">
                             {{ menuItem.name }} - {{ formatPrice(menuItem.price) }} FCFA
                           </option>
                         </select>
@@ -499,6 +500,18 @@
                           min="1"
                           class="input"
                           required
+                        />
+                      </div>
+                      <div class="w-24">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Prix unitaire</label>
+                        <input
+                          v-model.number="item.unit_price"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          class="input"
+                          required
+                          disabled
                         />
                       </div>
                       <button
@@ -607,14 +620,13 @@ export default {
       showOrderForm: false,
       isSubmittingOrder: false,
       orderForm: {
-        roomNumber: null,
+        room_number: null,
         status: 'pending',
         items: [
           {
-            menuItemId: '',
+            menu_item_id: '',
             quantity: 1,
-            name: '',
-            price: 0
+            unit_price: 0
           }
         ]
       },
@@ -623,6 +635,7 @@ export default {
       activeCategory: null,
       categories: [],
       menuItems: [],
+      itemImagePreview: null,
 
       // Statistiques
       stats: {
@@ -638,19 +651,16 @@ export default {
       editingItem: null,
       itemForm: {
         name: '',
-        category: '',
-        price: '',
+        category_id: '',
+        price: 0,
         description: '',
         available: true,
-        image: ''
+        image: null
       },
       itemImageFile: null,
 
       showDeleteModal: false,
-      itemToDelete: null,
-
-      isSubmitting: false,
-      isSubmittingItem: false
+      itemToDelete: null
     };
   },
   computed: {
@@ -658,29 +668,34 @@ export default {
       const query = this.orderSearch.toLowerCase();
       return this.orders.filter(order => 
         order.id.toString().includes(query) ||
-        (order.roomNumber && order.roomNumber.toString().includes(query)) ||
-        order.items.some(item => item.name.toLowerCase().includes(query))
+        (order.room_number && order.room_number.toString().includes(query)) ||
+        order.order_items.some(item => item.menu_item.name.toLowerCase().includes(query))
       );
     },
     filteredMenuItems() {
-      const selectedCategory = this.activeCategory || 
-                            (this.categories.length > 0 ? this.categories[0].id : null);
-      const categoryName = this.categories.find(c => c.id === selectedCategory)?.name;
+      if (!this.activeCategory) return this.menuItems;
+      
+      const category = this.categories.find(c => c.id === this.activeCategory);
+      if (!category) return this.menuItems;
+      
       return this.menuItems.filter(item => 
-        !categoryName || item.category === categoryName
+        item.category_id === category.id
       );
+    },
+    availableMenuItems() {
+      return this.menuItems.filter(item => item.available);
     },
     calculateOrderTotal() {
       return this.orderForm.items.reduce((total, item) => {
-        return total + (item.price * item.quantity);
+        return total + (item.unit_price * item.quantity);
       }, 0);
     }
   },
-  created() {
-    this.fetchOrders();
-    this.fetchMenuItems();
-    this.fetchCategories();
-    this.fetchStats();
+  async created() {
+    await this.fetchOrders();
+    await this.fetchMenuItems();
+    await this.fetchCategories();
+    await this.fetchStats();
     
     // Initialiser la catégorie active
     if (this.categories.length > 0 && !this.activeCategory) {
@@ -699,6 +714,12 @@ export default {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
       };
+    },
+    
+    getImageUrl(imagePath) {
+      if (!imagePath) return '';
+      if (imagePath.startsWith('http')) return imagePath;
+      return `${this.getApiBaseUrl().replace('/api', '')}/storage/${imagePath}`;
     },
     
     // Commandes API
@@ -724,8 +745,8 @@ export default {
         );
         return response.data;
       } catch (error) {
-        console.error("Erreur lors de la création de la commande:", error);
-        this.$toast.error(error.response?.data?.message || "Erreur lors de la création de la commande");
+        console.error("Erreur création commande:", error);
+        this.$toast.error(error.response?.data?.message || "Erreur lors de la création");
         throw error;
       }
     },
@@ -733,11 +754,11 @@ export default {
     async updateOrderStatus(orderId, status) {
       try {
         await axios.put(
-          `${this.getApiBaseUrl()}/orders/${orderId}/status`,
+          `${this.getApiBaseUrl()}/orders/${orderId}`,
           { status },
           { headers: this.getAuthHeader() }
         );
-        this.fetchOrders();
+        await this.fetchOrders();
         this.$toast.success("Statut de commande mis à jour");
       } catch (error) {
         console.error("Erreur lors de la mise à jour du statut:", error);
@@ -751,7 +772,7 @@ export default {
           `${this.getApiBaseUrl()}/orders/${orderId}`,
           { headers: this.getAuthHeader() }
         );
-        this.orders = this.orders.filter(o => o.id !== orderId);
+        await this.fetchOrders();
         this.$toast.success("Commande annulée");
       } catch (error) {
         console.error("Erreur lors de l'annulation de la commande:", error);
@@ -792,19 +813,20 @@ export default {
       try {
         const formData = new FormData();
         formData.append('name', this.itemForm.name);
-        formData.append('category', this.itemForm.category);
-        formData.append('price', parseFloat(this.itemForm.price));
+        formData.append('category_id', this.itemForm.category_id);
+        formData.append('price', this.itemForm.price);
         formData.append('description', this.itemForm.description || '');
         formData.append('available', this.itemForm.available ? '1' : '0');
+        
         if (this.itemImageFile) {
           formData.append('image', this.itemImageFile);
+        } else if (this.itemForm.image && typeof this.itemForm.image === 'string') {
+          // Si c'est une image existante (chemin string)
+          formData.append('image', this.itemForm.image);
         }
         
         if (this.editingItem) {
-          for (let pair of formData.entries()) {
-        console.log(pair[0] + ': ' + pair[1]);
-    }
-          await axios.put(
+          await axios.post(
             `${this.getApiBaseUrl()}/menu-items/${this.editingItem}`,
             formData,
             {
@@ -814,7 +836,6 @@ export default {
               }
             }
           );
-
           this.$toast.success("Article mis à jour");
         } else {
           await axios.post(
@@ -830,7 +851,7 @@ export default {
           this.$toast.success("Article ajouté");
         }
         
-        this.fetchMenuItems();
+        await this.fetchMenuItems();
         this.closeItemForm();
       } catch (error) {
         console.error("Erreur lors de l'enregistrement:", error);
@@ -846,7 +867,7 @@ export default {
           `${this.getApiBaseUrl()}/menu-items/${this.itemToDelete}`,
           { headers: this.getAuthHeader() }
         );
-        this.menuItems = this.menuItems.filter(i => i.id !== this.itemToDelete);
+        await this.fetchMenuItems();
         this.showDeleteModal = false;
         this.$toast.success("Article supprimé");
       } catch (error) {
@@ -878,10 +899,9 @@ export default {
     // Gestion des commandes
     addOrderItem() {
       this.orderForm.items.push({
-        menuItemId: '',
+        menu_item_id: '',
         quantity: 1,
-        name: '',
-        price: 0
+        unit_price: 0
       });
     },
     
@@ -892,23 +912,24 @@ export default {
     },
     
     updateSelectedItem(index) {
-      const selectedItem = this.menuItems.find(item => item.id === this.orderForm.items[index].menuItemId);
+      const selectedItem = this.availableMenuItems.find(item => item.id == this.orderForm.items[index].menu_item_id);
       if (selectedItem) {
-        this.orderForm.items[index].name = selectedItem.name;
-        this.orderForm.items[index].price = selectedItem.price;
+        this.orderForm.items[index].unit_price = selectedItem.price;
+      } else {
+        this.orderForm.items[index].unit_price = 0;
       }
     },
     
     async submitOrderForm() {
       this.isSubmittingOrder = true;
-      
       try {
         const orderData = {
-          roomNumber: this.orderForm.roomNumber || null,
+          room_number: this.orderForm.room_number,
           status: this.orderForm.status,
           items: this.orderForm.items.map(item => ({
-            menu_item_id: item.menuItemId,
-            quantity: item.quantity
+            menu_item_id: item.menu_item_id,
+            quantity: item.quantity,
+            unit_price: item.unit_price
           })),
           total: this.calculateOrderTotal
         };
@@ -916,9 +937,10 @@ export default {
         await this.createOrder(orderData);
         this.$toast.success("Commande créée avec succès");
         this.closeOrderForm();
-        this.fetchOrders();
+        await this.fetchOrders();
       } catch (error) {
-        console.error("Erreur lors de la création de la commande:", error);
+        console.error("Erreur création commande:", error);
+        this.$toast.error(error.response?.data?.message || "Erreur création commande");
       } finally {
         this.isSubmittingOrder = false;
       }
@@ -927,24 +949,21 @@ export default {
     closeOrderForm() {
       this.showOrderForm = false;
       this.orderForm = {
-        roomNumber: null,
+        room_number: null,
         status: 'pending',
         items: [
           {
-            menuItemId: '',
+            menu_item_id: '',
             quantity: 1,
-            name: '',
-            price: 0
+            unit_price: 0
           }
         ]
       };
     },
-/* eslint-disable */
+    
     // Impression de facture
- printInvoice(order) {
+    printInvoice(order) {
       const printWindow = window.open('', '_blank');
-      
-      // Préparer le contenu HTML
       
       const htmlContent = `
         <!DOCTYPE html>
@@ -969,7 +988,7 @@ export default {
           </div>
           
           <div class="info">
-            ${order.room_number ? `<p><strong>Chambre:</strong> ${order.room_number}</p>` : '<p><strong>Client:</strong> Non résident</p>'}
+            <p><strong>Chambre:</strong> ${order.room_number}</p>
             <p><strong>Statut:</strong> ${this.getStatusText(order.status)}</p>
           </div>
           
@@ -983,12 +1002,12 @@ export default {
               </tr>
             </thead>
             <tbody>
-              ${order.items.map(item => `
+              ${order.order_items.map(item => `
                 <tr>
-                  <td>${item.name}</td>
+                  <td>${item.menu_item.name}</td>
                   <td>${item.quantity}</td>
-                  <td>${this.formatPrice(item.price)} FCFA</td>
-                  <td>${this.formatPrice(item.price * item.quantity)} FCFA</td>
+                  <td>${this.formatPrice(item.unit_price)} FCFA</td>
+                  <td>${this.formatPrice(item.unit_price * item.quantity)} FCFA</td>
                 </tr>
               `).join('')}
             </tbody>
@@ -1010,7 +1029,6 @@ export default {
         </html>
       `;
 
-    // Écrire le contenu dans la nouvelle fenêtre
       printWindow.document.open();
       printWindow.document.write(htmlContent);
       printWindow.document.close();
@@ -1018,7 +1036,10 @@ export default {
 
     editMenuItem(item) {
       this.editingItem = item.id;
-      this.itemForm = { ...item };
+      this.itemForm = {
+        ...item,
+        category_id: item.category_id || item.category?.id
+      };
       this.showItemForm = true;
     },
     
@@ -1040,14 +1061,15 @@ export default {
       
       const reader = new FileReader();
       reader.onload = (e) => {
-        this.itemForm.image = e.target.result;
+        this.itemImagePreview = e.target.result;
       };
       reader.readAsDataURL(file);
     },
     
     removeItemImage() {
-      this.itemForm.image = '';
+      this.itemForm.image = null;
       this.itemImageFile = null;
+      this.itemImagePreview = null;
       if (this.$refs.itemFileInput) this.$refs.itemFileInput.value = '';
     },
     
@@ -1056,13 +1078,14 @@ export default {
       this.editingItem = null;
       this.itemForm = {
         name: '',
-        category: '',
-        price: '',
+        category_id: '',
+        price: 0,
         description: '',
         available: true,
-        image: ''
+        image: null
       };
       this.itemImageFile = null;
+      this.itemImagePreview = null;
       if (this.$refs.itemFileInput) this.$refs.itemFileInput.value = '';
     },
     
@@ -1087,6 +1110,7 @@ export default {
     },
     
     formatDate(date) {
+      if (!date) return '';
       return new Date(date).toLocaleString('fr-FR', {
         day: '2-digit',
         month: '2-digit',
@@ -1097,6 +1121,7 @@ export default {
     },
     
     formatShortDate(date) {
+      if (!date) return '';
       return new Date(date).toLocaleString('fr-FR', {
         hour: '2-digit',
         minute: '2-digit'
