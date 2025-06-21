@@ -134,25 +134,9 @@
                 </div>
                 <div class="ml-4">
                   <p class="text-sm font-medium text-gray-900">Nouvelle réservation</p>
-                  <p class="text-sm text-gray-500">Chambre #205</p>
+                  <p class="text-sm text-gray-500">Chambre #{{reservations[reservations.length - 1]['chambre'].numero_chambre}}</p>
                 </div>
-                <div class="ml-auto text-sm text-gray-500">Il y a 2h</div>
-              </div>
-            </div>
-            
-            <!-- Activity Item -->
-            <div class="p-4 hover:bg-gray-50 transition-colors duration-150">
-              <div class="flex items-center">
-                <div class="flex-shrink-0 bg-green-100 rounded-full p-2">
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-                <div class="ml-4">
-                  <p class="text-sm font-medium text-gray-900">Paiement confirmé</p>
-                  <p class="text-sm text-gray-500">Réservation #4587</p>
-                </div>
-                <div class="ml-auto text-sm text-gray-500">Il y a 5h</div>
+                <div class="ml-auto text-sm text-gray-500">Il y'a {{getHour()}} h</div>
               </div>
             </div>
             
@@ -165,8 +149,8 @@
                   </svg>
                 </div>
                 <div class="ml-4">
-                  <p class="text-sm font-medium text-gray-900"></p>
-                  <p class="text-sm text-gray-500"> s'est inscrite</p>
+                  <p class="text-sm font-medium text-gray-900">{{ users[users.length-1].name }}</p>
+                  <p class="text-sm text-gray-500"> s'est inscrit(e)</p>
                 </div>
                 <div class="ml-auto text-sm text-gray-500"></div>
               </div>
@@ -180,6 +164,7 @@
 
 <script>
 import axios from 'axios';
+/* eslint-disable */
 
 export default {
   data() {
@@ -219,7 +204,20 @@ export default {
       localStorage.removeItem('token');
       delete axios.defaults.headers.common['Authorization'];
       this.$router.push('/login');
-    }
+    },
+    getHour() {
+      if (!Array.isArray(this.reservations) || this.reservations.length === 0) {
+        return "Aucune réservation";
+      }
+
+      const lastReservation = this.reservations[this.reservations.length - 1];
+
+      const createdDate = new Date(lastReservation.created_at);
+      const updatedDate = new Date(lastReservation.updated_at);
+
+      return Math.floor((updatedDate - createdDate) / (1000 * 60 * 60*60));
+}
+
   }
 };
 </script>

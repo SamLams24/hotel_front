@@ -248,8 +248,13 @@
 
 <script>
 import axios from "axios";
-
+import { useToast } from "vue-toastification";
+/* eslint-disable */
 export default {
+  setup() {
+    const toast = useToast();
+    return { toast };
+  },
   data() {
     return {
       chambres: [],
@@ -305,7 +310,7 @@ export default {
         this.chambres = response.data.chambres;
       } catch (error) {
         console.error("Erreur lors de la récupération des chambres", error);
-        this.$toast.error(error.response?.data?.message || "Erreur lors de la récupération des chambres");
+        this.toast.error(error.response?.data?.message || "Erreur lors de la récupération des chambres");
       }
     },
     
@@ -334,12 +339,12 @@ export default {
       if (!file) return;
 
       if (!file.type.match('image.*')) {
-        this.$toast.error("Veuillez sélectionner une image valide (JPG, PNG)");
+        this.toast.error("Veuillez sélectionner une image valide (JPG, PNG)");
         return;
       }
 
       if (file.size > 2 * 1024 * 1024) {
-        this.$toast.error("La taille de l'image ne doit pas dépasser 2MB");
+        this.toast.error("La taille de l'image ne doit pas dépasser 2MB");
         return;
       }
 
@@ -395,7 +400,7 @@ export default {
             }
           });
           this.chambres = this.chambres.map(c => 
-            c.id === this.editingChambre ? response.data : c
+            c.id === this.editingChambre ? response.data.chambre : c
           );
         } else {
           response = await axios.post(`${this.getApiBaseUrl()}/chambre`, formData, {
@@ -409,10 +414,10 @@ export default {
         
         this.showForm = false;
         this.cancelForm();
-        this.$toast.success(`Chambre ${this.editingChambre ? 'modifiée' : 'ajoutée'} avec succès`);
+        this.toast.success(`Chambre ${this.editingChambre ? 'modifiée' : 'ajoutée'} avec succès`);
       } catch (error) {
         console.error("Erreur lors de l'enregistrement", error);
-        this.$toast.error(error.response?.data?.message || "Une erreur est survenue lors de l'enregistrement");
+        this.toast.error(error.response?.data?.message || "Une erreur est survenue lors de l'enregistrement");
       } finally {
         this.isSubmitting = false;
       }
@@ -430,10 +435,10 @@ export default {
         });
         this.chambres = this.chambres.filter(c => c.id !== this.chambreToDelete);
         this.showDeleteModal = false;
-        this.$toast.success("Chambre supprimée avec succès");
+        this.toast.success("Chambre supprimée avec succès");
       } catch (error) {
         console.error("Erreur lors de la suppression", error);
-        this.$toast.error(error.response?.data?.message || "Erreur lors de la suppression");
+        this.toast.error(error.response?.data?.message || "Erreur lors de la suppression");
       }
     },
     

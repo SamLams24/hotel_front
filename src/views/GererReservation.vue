@@ -162,8 +162,13 @@
 
 <script>
 import axios from 'axios';
-
+import { useToast } from 'vue-toastification';
+/* eslint-disable */
 export default {
+  setup() {
+    const toast = useToast();
+    return { toast };
+  },
   data() {
     return {
       reservations: [],

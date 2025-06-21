@@ -263,7 +263,7 @@ export default {
 
       try {
         const response = await axios.post(`/reservation`, {
-          user_id: 1, // Remplacer plus tard par ID dynamique
+          user_id: this.$store.state.user.id,
           chambre_id: this.selectedChambreId,
           date_arrive: this.dateArrive,
           date_depart: this.dateDepart,

@@ -270,7 +270,7 @@ import axios from 'axios';
 import flatpickr from 'flatpickr';
 import 'flatpickr/dist/l10n/fr'; 
 import 'flatpickr/dist/flatpickr.min.css';
-
+/* eslint-disable */
 export default {
   data() {
     return {

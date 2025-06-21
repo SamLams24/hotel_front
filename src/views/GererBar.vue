@@ -603,8 +603,15 @@
 
 <script>
 import axios from "axios";
-
+import { useToast } from "vue-toastification";
+import { ref } from "vue";
+import { toRaw } from 'vue';
+/* eslint-disable */
 export default {
+  setup() {
+    const toast = useToast();
+    return { toast };
+  },
   data() {
     return {
       activeTab: 'orders',
@@ -635,6 +642,7 @@ export default {
       activeCategory: null,
       categories: [],
       menuItems: [],
+
       itemImagePreview: null,
 
       // Statistiques
@@ -660,7 +668,8 @@ export default {
       itemImageFile: null,
 
       showDeleteModal: false,
-      itemToDelete: null
+      itemToDelete: null,
+      isSubmittingItem: false
     };
   },
   computed: {
@@ -674,13 +683,9 @@ export default {
     },
     filteredMenuItems() {
       if (!this.activeCategory) return this.menuItems;
-      
-      const category = this.categories.find(c => c.id === this.activeCategory);
+      const category = this.categories.find(c => String(c.id) === String(this.activeCategory));
       if (!category) return this.menuItems;
-      
-      return this.menuItems.filter(item => 
-        item.category_id === category.id
-      );
+      return this.menuItems.filter(item => item.category === category.name);
     },
     availableMenuItems() {
       return this.menuItems.filter(item => item.available);
@@ -692,15 +697,10 @@ export default {
     }
   },
   async created() {
-    await this.fetchOrders();
-    await this.fetchMenuItems();
     await this.fetchCategories();
+    await this.fetchMenuItems();
+    await this.fetchOrders();
     await this.fetchStats();
-    
-    // Initialiser la catégorie active
-    if (this.categories.length > 0 && !this.activeCategory) {
-      this.activeCategory = this.categories[0].id;
-    }
   },
   methods: {
     // API Configuration
@@ -731,7 +731,7 @@ export default {
         this.orders = response.data.data || response.data;
       } catch (error) {
         console.error("Erreur lors de la récupération des commandes:", error);
-        this.$toast.error(error.response?.data?.message || "Erreur lors de la récupération des commandes");
+        this.toast.error(error.response?.data?.message || "Erreur lors de la récupération des commandes");
         this.orders = [];
       }
     },
@@ -746,7 +746,7 @@ export default {
         return response.data;
       } catch (error) {
         console.error("Erreur création commande:", error);
-        this.$toast.error(error.response?.data?.message || "Erreur lors de la création");
+        this.toast.error(error.response?.data?.message || "Erreur lors de la création");
         throw error;
       }
     },
@@ -754,15 +754,15 @@ export default {
     async updateOrderStatus(orderId, status) {
       try {
         await axios.put(
-          `${this.getApiBaseUrl()}/orders/${orderId}`,
+          `${this.getApiBaseUrl()}/orders/${orderId}/status`,
           { status },
           { headers: this.getAuthHeader() }
         );
         await this.fetchOrders();
-        this.$toast.success("Statut de commande mis à jour");
+        this.toast.success("Statut de commande mis à jour");
       } catch (error) {
         console.error("Erreur lors de la mise à jour du statut:", error);
-        this.$toast.error(error.response?.data?.message || "Erreur lors de la mise à jour du statut");
+        this.toast.error(error.response?.data?.message || "Erreur lors de la mise à jour du statut");
       }
     },
     
@@ -773,10 +773,10 @@ export default {
           { headers: this.getAuthHeader() }
         );
         await this.fetchOrders();
-        this.$toast.success("Commande annulée");
+        this.toast.success("Commande annulée");
       } catch (error) {
         console.error("Erreur lors de l'annulation de la commande:", error);
-        this.$toast.error(error.response?.data?.message || "Erreur lors de l'annulation de la commande");
+        this.toast.error(error.response?.data?.message || "Erreur lors de l'annulation de la commande");
       }
     },
     
@@ -789,7 +789,7 @@ export default {
         this.menuItems = response.data.data || response.data;
       } catch (error) {
         console.error("Erreur lors de la récupération du menu:", error);
-        this.$toast.error(error.response?.data?.message || "Erreur lors de la récupération du menu");
+        this.toast.error(error.response?.data?.message || "Erreur lors de la récupération du menu");
         this.menuItems = [];
       }
     },
@@ -800,43 +800,57 @@ export default {
           headers: this.getAuthHeader()
         });
         this.categories = response.data.data || response.data;
+        if (this.categories.length > 0 && !this.activeCategory) {
+          this.activeCategory = this.categories[0].id;
+        }
       } catch (error) {
         console.error("Erreur lors de la récupération des catégories:", error);
-        this.$toast.error(error.response?.data?.message || "Erreur lors de la récupération des catégories");
+        this.toast.error(error.response?.data?.message || "Erreur lors de la récupération des catégories");
         this.categories = [];
       }
     },
     
     async submitItemForm() {
       this.isSubmittingItem = true;
-      
       try {
         const formData = new FormData();
         formData.append('name', this.itemForm.name);
-        formData.append('category_id', this.itemForm.category_id);
+
+        const selectedCategory = this.categories.find(
+          c => String(c.id) === String(this.itemForm.category_id)
+        );
+        const categoryName = selectedCategory ? selectedCategory.name : '';
+        formData.append('category', categoryName);
+
         formData.append('price', this.itemForm.price);
         formData.append('description', this.itemForm.description || '');
         formData.append('available', this.itemForm.available ? '1' : '0');
-        
         if (this.itemImageFile) {
           formData.append('image', this.itemImageFile);
         } else if (this.itemForm.image && typeof this.itemForm.image === 'string') {
-          // Si c'est une image existante (chemin string)
           formData.append('image', this.itemForm.image);
         }
-        
+
+        console.log("Données envoyées:", {
+          name: this.itemForm.name,
+          category: categoryName,
+          price: this.itemForm.price,
+          description: this.itemForm.description,
+          available: this.itemForm.available,
+          image: this.itemImageFile || this.itemForm.image
+        });
+
         if (this.editingItem) {
-          await axios.post(
+          await axios.put(
             `${this.getApiBaseUrl()}/menu-items/${this.editingItem}`,
             formData,
             {
               headers: {
                 ...this.getAuthHeader(),
-                'Content-Type': 'multipart/form-data'
               }
             }
           );
-          this.$toast.success("Article mis à jour");
+          this.toast.success("Article mis à jour");
         } else {
           await axios.post(
             `${this.getApiBaseUrl()}/menu-items`,
@@ -844,18 +858,18 @@ export default {
             {
               headers: {
                 ...this.getAuthHeader(),
-                'Content-Type': 'multipart/form-data'
               }
             }
           );
-          this.$toast.success("Article ajouté");
+          this.toast.success("Article ajouté");
         }
-        
+
         await this.fetchMenuItems();
         this.closeItemForm();
       } catch (error) {
         console.error("Erreur lors de l'enregistrement:", error);
-        this.$toast.error(error?.response?.data?.message || "Erreur lors de l'enregistrement");
+        console.error("Détail de l'erreur:", error.response?.data);
+        this.toast.error(error?.response?.data?.message || "Erreur lors de l'enregistrement");
       } finally {
         this.isSubmittingItem = false;
       }
@@ -869,10 +883,10 @@ export default {
         );
         await this.fetchMenuItems();
         this.showDeleteModal = false;
-        this.$toast.success("Article supprimé");
+        this.toast.success("Article supprimé");
       } catch (error) {
         console.error("Erreur lors de la suppression:", error);
-        this.$toast.error(error.response?.data?.message || "Erreur lors de la suppression");
+        this.toast.error(error.response?.data?.message || "Erreur lors de la suppression");
       }
     },
     
@@ -885,7 +899,7 @@ export default {
         this.stats = response.data.data || response.data;
       } catch (error) {
         console.error("Erreur lors de la récupération des stats:", error);
-        this.$toast.error(error.response?.data?.message || "Erreur lors de la récupération des statistiques");
+        this.toast.error(error.response?.data?.message || "Erreur lors de la récupération des statistiques");
         this.stats = {
           todayRevenue: 0,
           monthlyOrders: 0,
@@ -935,12 +949,12 @@ export default {
         };
         
         await this.createOrder(orderData);
-        this.$toast.success("Commande créée avec succès");
+        this.toast.success("Commande créée avec succès");
         this.closeOrderForm();
         await this.fetchOrders();
       } catch (error) {
         console.error("Erreur création commande:", error);
-        this.$toast.error(error.response?.data?.message || "Erreur création commande");
+        this.toast.error(error.response?.data?.message || "Erreur création commande");
       } finally {
         this.isSubmittingOrder = false;
       }
@@ -1048,12 +1062,12 @@ export default {
       if (!file) return;
 
       if (!file.type.match('image.*')) {
-        this.$toast.error("Veuillez sélectionner une image valide (JPG, PNG)");
+        this.toast.error("Veuillez sélectionner une image valide (JPG, PNG)");
         return;
       }
 
       if (file.size > 2 * 1024 * 1024) {
-        this.$toast.error("La taille de l'image ne doit pas dépasser 2MB");
+        this.toast.error("La taille de l'image ne doit pas dépasser 2MB");
         return;
       }
 
