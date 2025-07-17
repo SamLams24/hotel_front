@@ -1,361 +1,481 @@
 <template>
-  <div class="min-h-screen bg-gray-50 py-8 px-4">
+  <div class="min-h-screen bg-gray-50 py-8 px-4 sm:px-6">
     <div class="max-w-4xl mx-auto">
       <!-- Header -->
-      <div class="mb-8">
-        <h1 class="text-3xl font-bold text-gray-800">🗓️ Gestion des Réservations</h1>
-        <p class="mt-2 text-gray-600">Gérez toutes les réservations de votre établissement</p>
-      </div>
-
-      <!-- Formulaire d'édition/ajout -->
-      <div v-if="showForm" class="bg-white shadow-md rounded-lg p-6 mb-8 transition-all duration-300">
-        <h2 class="text-xl font-semibold mb-4">
-          {{ editingReservation ? '✏️ Modifier Réservation' : '➕ Nouvelle Réservation' }}
-        </h2>
-        
-        <form @submit.prevent="submitReservation" class="space-y-4">
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Chambre</label>
-              <select v-model="formData.chambre_id" required
-                     class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option v-for="chambre in chambres" :key="chambre.id" :value="chambre.id">
-                  Chambre {{ chambre.numero_chambre }} ({{ chambre.type }})
-                </option>
-              </select>
-            </div>
-            
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Utilisateur</label>
-              <select v-model="formData.user_id" required
-                     class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option v-for="user in users" :key="user.id" :value="user.id">
-                  {{ user.name }} ({{ user.email }})
-                </option>
-              </select>
-            </div>
-            
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Date Arrivée</label>
-              <input v-model="formData.date_arrive" type="date" required
-                     @change="calculateDuration"
-                     class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-            </div>
-            
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Date Départ</label>
-              <input v-model="formData.date_depart" type="date" required
-                     @change="calculateDuration"
-                     class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-            </div>
-            
-            <div v-if="durationDays > 0">
-              <label class="block text-sm font-medium text-gray-700 mb-1">Durée (jours)</label>
-              <input :value="durationDays" type="number" disabled
-                     class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100">
-            </div>
-          </div>
-
-          <div class="flex justify-end space-x-3 pt-4">
-            <button @click="cancelForm" type="button"
-                    class="px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400 transition">
-              Annuler
-            </button>
-            <button type="submit"
-                    class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition">
-              {{ editingReservation ? 'Mettre à jour' : 'Ajouter' }}
-            </button>
-          </div>
-        </form>
-      </div>
-
-      <!-- Bouton d'ajout -->
-      <div class="mb-6 flex justify-between items-center">
-        <div class="relative w-64">
-          <input v-model="searchQuery" type="text" placeholder="Rechercher..." 
-                 class="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-          <span class="absolute left-3 top-2.5 text-gray-400">🔍</span>
+      <div
+        class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4"
+      >
+        <div>
+          <h1 class="text-3xl font-bold text-gray-800">
+            🗓️ Gestion des Réservations
+          </h1>
+          <p class="text-gray-600 mt-2">
+            Créez et administrez les réservations des clients.
+          </p>
         </div>
-        <button @click="showAddForm"
-                class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition flex items-center">
-          <span>➕</span>
-          <span class="ml-2">Nouvelle Réservation</span>
+        <button
+          @click="showForm = !showForm"
+          class="btn-primary flex items-center"
+        >
+          <span class="mr-2">{{ showForm ? "➖" : "➕" }}</span>
+          {{ showForm ? "Masquer le formulaire" : "Nouvelle Réservation" }}
         </button>
       </div>
 
+      <!-- Formulaire de création/modification -->
+      <transition name="slide-fade">
+        <div v-if="showForm" class="bg-white shadow-xl rounded-lg p-6 mb-8">
+          <h2 class="text-2xl font-semibold mb-6">{{ formTitle }}</h2>
+
+          <form @submit.prevent="submitReservation" class="space-y-6">
+            <!-- Section Recherche Client -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">
+                Client <span class="text-red-500">*</span>
+              </label>
+              <div
+                v-if="selectedUser"
+                class="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg flex justify-between items-center"
+              >
+                <div>
+                  <p class="font-semibold">{{ selectedUser.name }}</p>
+                  <p class="text-sm text-gray-600">{{ selectedUser.email }}</p>
+                </div>
+                <button
+                  @click="resetUserSelection"
+                  type="button"
+                  class="p-2 text-red-500 hover:text-red-700"
+                >
+                  ✖
+                </button>
+              </div>
+              <div v-else class="relative">
+                <input
+                  v-model="userSearchQuery"
+                  @input="debouncedSearchUsers"
+                  type="text"
+                  placeholder="Taper le nom ou l'email du client..."
+                  class="input"
+                />
+                <ul
+                  v-if="userSearchResults.length > 0"
+                  class="absolute z-10 w-full bg-white border border-gray-300 rounded-md mt-1 max-h-48 overflow-y-auto"
+                >
+                  <li
+                    v-for="user in userSearchResults"
+                    :key="user.id"
+                    @click="selectUser(user)"
+                    class="p-3 hover:bg-gray-100 cursor-pointer"
+                  >
+                    {{ user.name }} ({{ user.email }})
+                  </li>
+                </ul>
+              </div>
+              <p class="text-sm text-gray-500 mt-2">
+                Client non trouvé ?
+                <button
+                  @click="showNewUserModal = true"
+                  type="button"
+                  class="text-blue-600 hover:underline"
+                >
+                  Créer un nouveau compte.
+                </button>
+              </p>
+            </div>
+
+            <!-- Champs de réservation -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1"
+                  >Chambre <span class="text-red-500">*</span></label
+                >
+                <select v-model="formData.chambre_id" required class="input">
+                  <option value="" disabled>
+                    Sélectionnez une chambre disponible
+                  </option>
+                  <option
+                    v-for="chambre in availableRooms"
+                    :key="chambre.id"
+                    :value="chambre.id"
+                  >
+                    N°{{ chambre.numero_chambre }} ({{ chambre.type }}) -
+                    {{ chambre.prix_nuite }} FCFA
+                  </option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1"
+                  >Durée du séjour</label
+                >
+                <input
+                  :value="
+                    durationDays > 0
+                      ? `${durationDays} jour(s)`
+                      : 'Non calculée'
+                  "
+                  type="text"
+                  disabled
+                  class="input bg-gray-100"
+                />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1"
+                  >Date d'arrivée <span class="text-red-500">*</span></label
+                >
+                <input
+                  v-model="formData.date_arrive"
+                  type="date"
+                  required
+                  @change="calculateDuration"
+                  class="input"
+                />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1"
+                  >Date de départ <span class="text-red-500">*</span></label
+                >
+                <input
+                  v-model="formData.date_depart"
+                  type="date"
+                  required
+                  @change="calculateDuration"
+                  class="input"
+                />
+              </div>
+            </div>
+
+            <div class="flex justify-end space-x-4 pt-4">
+              <button @click="cancelForm" type="button" class="btn-secondary">
+                Annuler
+              </button>
+              <button
+                type="submit"
+                class="btn-primary"
+                :disabled="isSubmitting"
+              >
+                {{ submitButtonText }}
+              </button>
+            </div>
+          </form>
+        </div>
+      </transition>
+
       <!-- Liste des réservations -->
       <div class="bg-white shadow-md rounded-lg overflow-hidden">
-        <div v-if="filteredReservations.length === 0" class="p-8 text-center text-gray-500">
-          Aucune réservation trouvée
-        </div>
-        
-        <ul v-else class="divide-y divide-gray-200">
-          <li v-for="reservation in filteredReservations" :key="reservation.id" 
-              class="p-6 hover:bg-gray-50 transition">
-            <div class="flex justify-between items-start">
-              <div class="space-y-2">
-                <p class="font-medium">
-                  <span class="text-blue-600">#{{ reservation.numero_reservation }}</span> - 
-                  Chambre {{ getChambreNumber(reservation.chambre_id) }}
-                </p>
-                <p class="text-sm text-gray-600">
-                  <span class="font-medium">Client:</span> {{ getUserName(reservation.user_id) }}
-                </p>
-                <p class="text-sm text-gray-600">
-                  <span class="font-medium">Période:</span> 
-                  {{ formatDate(reservation.date_arrive) }} → {{ formatDate(reservation.date_depart) }}
-                  <span class="ml-2 px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">
-                    {{ calculateDays(reservation.date_arrive, reservation.date_depart) }} jours
-                  </span>
-                </p>
-                <p class="text-sm text-gray-600">
-                  <span class="font-medium">Date réservation:</span> 
-                  {{ formatDateTime(reservation.created_at) }}
-                </p>
-              </div>
-              
-              <div class="flex space-x-2">
-                <button @click="editReservation(reservation)"
-                        class="p-2 text-yellow-600 hover:bg-yellow-100 rounded-full transition">
-                  ✏️
-                </button>
-                <button @click="confirmDelete(reservation.id)"
-                        class="p-2 text-red-600 hover:bg-red-100 rounded-full transition">
-                  🗑️
-                </button>
-              </div>
+        <ul v-if="reservations.length" class="divide-y divide-gray-200">
+          <li
+            v-for="reservation in reservations"
+            :key="reservation.id"
+            class="p-4 hover:bg-gray-50 flex flex-col sm:flex-row justify-between sm:items-center"
+          >
+            <div>
+              <p class="font-semibold text-blue-700">
+                #{{ reservation.numero_reservation }}
+              </p>
+              <p class="text-sm text-gray-800">
+                Chambre {{ reservation.chambre.numero_chambre }} ({{
+                  reservation.chambre.type
+                }})
+              </p>
+              <p class="text-sm text-gray-600">
+                Client : {{ reservation.user.name }}
+              </p>
+              <p class="text-sm text-gray-500">
+                Du {{ formatDate(reservation.date_arrive) }} au
+                {{ formatDate(reservation.date_depart) }}
+              </p>
+            </div>
+            <div class="flex space-x-2 mt-3 sm:mt-0">
+              <button
+                @click="editReservation(reservation)"
+                class="btn-icon-edit"
+              >
+                ✏️
+              </button>
+              <button
+                @click="confirmDelete(reservation.id)"
+                class="btn-icon-delete"
+              >
+                🗑️
+              </button>
             </div>
           </li>
         </ul>
+        <p v-else class="p-8 text-center text-gray-500">
+          Aucune réservation à afficher.
+        </p>
       </div>
     </div>
 
-    <!-- Modal de confirmation -->
-    <div v-if="showDeleteModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
-      <div class="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-        <div class="flex items-start">
-          <div class="flex-shrink-0 h-10 w-10 bg-red-100 rounded-full flex items-center justify-center text-red-600 mr-4">
-            ❗
+    <!-- Modal Nouveau Client -->
+    <div
+      v-if="showNewUserModal"
+      class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50"
+    >
+      <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+        <h3 class="text-xl font-bold mb-4">Créer un nouveau client</h3>
+        <form @submit.prevent="handleCreateUser" class="space-y-4">
+          <input
+            v-model="newUserForm.name"
+            placeholder="Nom complet"
+            class="input"
+            required
+          />
+          <input
+            v-model="newUserForm.email"
+            type="email"
+            placeholder="Email"
+            class="input"
+            required
+          />
+          <input
+            v-model="newUserForm.password"
+            type="password"
+            placeholder="Mot de passe temporaire"
+            class="input"
+            required
+          />
+          <div class="flex justify-end space-x-4">
+            <button
+              @click="showNewUserModal = false"
+              type="button"
+              class="btn-secondary"
+            >
+              Annuler
+            </button>
+            <button
+              type="submit"
+              class="btn-primary"
+              :disabled="isCreatingUser"
+            >
+              Créer et Sélectionner
+            </button>
           </div>
-          <div>
-            <h3 class="text-lg font-medium text-gray-900">Confirmer la suppression</h3>
-            <p class="mt-2 text-sm text-gray-500">
-              Êtes-vous sûr de vouloir supprimer cette réservation ? Cette action est irréversible.
-            </p>
-          </div>
-        </div>
-        <div class="mt-6 flex justify-end space-x-3">
-          <button @click="showDeleteModal = false" type="button"
-                  class="px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400 transition">
-            Annuler
-          </button>
-          <button @click="deleteReservation" type="button"
-                  class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition">
-            Supprimer
-          </button>
-        </div>
+        </form>
       </div>
     </div>
   </div>
 </template>
 
-<script>
-import axios from 'axios';
-import { useToast } from 'vue-toastification';
-/* eslint-disable */
-export default {
-  setup() {
-    const toast = useToast();
-    return { toast };
-  },
-  data() {
-    return {
-      reservations: [],
-      chambres: [],
-      users: [],
-      searchQuery: '',
-      showForm: false,
-      editingReservation: null,
-      showDeleteModal: false,
-      reservationToDelete: null,
-      durationDays: 0,
-      formData: {
-        chambre_id: '',
-        user_id: '',
-        date_arrive: '',
-        date_depart: '',
-      }
-    };
-  },
-  computed: {
-    filteredReservations() {
-      return this.reservations.filter(reservation => {
-        const search = this.searchQuery.toLowerCase();
-        return (
-          reservation.numero_reservation.toLowerCase().includes(search) ||
-          this.getChambreNumber(reservation.chambre_id).toString().includes(search) ||
-          this.getUserName(reservation.user_id).toLowerCase().includes(search)
-        );
-      });
-    }
-  },
-  async created() {
-    await this.getReservations();
-    await this.getChambres();
-    await this.getUsers();
-  },
-  methods: {
-    async getReservations() {
-      try {
-        const response = await axios.get('/reservations');
-        this.reservations = response.data.data || response.data;
-      } catch (error) {
-        console.error("Erreur lors de la récupération des réservations", error);
-      }
-    },
-    
-    async getChambres() {
-      try {
-        const response = await axios.get('/chambres');
-        this.chambres = response.data.chambres || response.data;
-      } catch (error) {
-        console.error("Erreur lors de la récupération des chambres", error);
-      }
-    },
-    
-    async getUsers() {
-      try {
-        const response = await axios.get('/users');
-        this.users = response.data;
-      } catch (error) {
-        console.error("Erreur lors de la récupération des utilisateurs", error);
-      }
-    },
-    
-    getChambreNumber(chambreId) {
-      const chambre = this.chambres.find(c => c.id === chambreId);
-      return chambre ? chambre.numero_chambre : 'N/A';
-    },
-    
-    getUserName(userId) {
-      const user = this.users.find(u => u.id === userId);
-      return user ? user.name : 'N/A';
-    },
-    
-    showAddForm() {
-      this.resetForm();
-      this.editingReservation = null;
-      this.showForm = true;
-    },
-    
-    editReservation(reservation) {
-      this.formData = { ...reservation };
-      this.editingReservation = reservation.id;
-      this.durationDays = this.calculateDays(reservation.date_arrive, reservation.date_depart);
-      this.showForm = true;
-    },
-    
-    cancelForm() {
-      this.showForm = false;
-      this.resetForm();
-    },
-    
-    resetForm() {
-      this.formData = {
-        chambre_id: '',
-        user_id: '',
-        date_arrive: '',
-        date_depart: '',
-      };
-      this.durationDays = 0;
-    },
-    
-    calculateDuration() {
-      if (this.formData.date_arrive && this.formData.date_depart) {
-        this.durationDays = this.calculateDays(this.formData.date_arrive, this.formData.date_depart);
-      }
-    },
-    
-    calculateDays(startDate, endDate) {
-      const start = new Date(startDate);
-      const end = new Date(endDate);
-      const diffTime = end - start;
-      return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    },
-    
-    async submitReservation() {
-      try {
-        const reservationData = { ...this.formData };
-        
-        if (this.editingReservation) {
-          await axios.put(`/reservation/${this.editingReservation}`, reservationData);
-          const index = this.reservations.findIndex(r => r.id === this.editingReservation);
-          if (index !== -1) {
-            this.reservations[index] = { ...reservationData, id: this.editingReservation };
-          }
-        } else {
-          const response = await axios.post('/reservation', reservationData);
-          this.reservations.push(response.data);
-        }
-        
-        this.showForm = false;
-        this.resetForm();
-      } catch (error) {
-        console.error("Erreur lors de l'enregistrement", error);
-      }
-    },
-    
-    confirmDelete(id) {
-      this.reservationToDelete = id;
-      this.showDeleteModal = true;
-    },
-    
-    async deleteReservation() {
-      try {
-        await axios.delete(`/reservation/${this.reservationToDelete}`);
-        this.reservations = this.reservations.filter(r => r.id !== this.reservationToDelete);
-        this.showDeleteModal = false;
-      } catch (error) {
-        console.error("Erreur lors de la suppression", error);
-      }
-    },
-    
-    formatDate(dateString) {
-      if (!dateString) return 'N/A';
-      const options = { year: 'numeric', month: 'short', day: 'numeric' };
-      return new Date(dateString).toLocaleDateString('fr-FR', options);
-    },
-    
-    formatDateTime(dateTimeString) {
-      if (!dateTimeString) return 'N/A';
-      const options = { 
-        year: 'numeric', 
-        month: 'short', 
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      };
-      return new Date(dateTimeString).toLocaleDateString('fr-FR', options);
-    }
+<script setup>
+import { ref, onMounted, computed } from "vue";
+import axios from "axios";
+import { useToast } from "vue-toastification";
+
+const reservations = ref([]);
+const chambres = ref([]);
+const toast = useToast();
+const showForm = ref(false);
+const editingReservation = ref(null);
+const isSubmitting = ref(false);
+
+const userSearchQuery = ref("");
+const userSearchResults = ref([]);
+const selectedUser = ref(null);
+const debounceTimer = ref(null);
+
+const showNewUserModal = ref(false);
+const isCreatingUser = ref(false);
+const newUserForm = ref({ name: "", email: "", password: "" });
+
+const formData = ref({
+  user_id: "",
+  chambre_id: "",
+  date_arrive: "",
+  date_depart: ""
+});
+const durationDays = ref(0);
+
+const formTitle = computed(() =>
+  editingReservation.value
+    ? "Modifier la Réservation"
+    : "Créer une Nouvelle Réservation"
+);
+const submitButtonText = computed(() => {
+  if (isSubmitting.value) return "Enregistrement...";
+  return editingReservation.value
+    ? "Mettre à jour"
+    : "Confirmer la Réservation";
+});
+const availableRooms = computed(() => {
+  return chambres.value.filter(
+    (c) =>
+      c.disponibilite ||
+      (editingReservation.value && c.id === editingReservation.value.chambre_id)
+  );
+});
+
+const fetchAllData = async () => {
+  try {
+    const [resReservations, resChambres] = await Promise.all([
+      axios.get("/reservations"),
+      axios.get("/chambres")
+    ]);
+    reservations.value = resReservations.data.data;
+    chambres.value = resChambres.data.chambres;
+  } catch (error) {
+    toast.error("Erreur de chargement des données.");
   }
 };
+
+const calculateDuration = () => {
+  if (formData.value.date_arrive && formData.value.date_depart) {
+    const start = new Date(formData.value.date_arrive);
+    const end = new Date(formData.value.date_depart);
+    durationDays.value =
+      end > start ? Math.ceil((end - start) / (1000 * 60 * 60 * 24)) : 0;
+  } else {
+    durationDays.value = 0;
+  }
+};
+
+const searchUsers = async () => {
+  if (userSearchQuery.value.length < 2) {
+    userSearchResults.value = [];
+    return;
+  }
+  try {
+    const response = await axios.get(
+      `/users/search?query=${userSearchQuery.value}`
+    );
+    userSearchResults.value = response.data;
+  } catch (error) {
+    console.error("Erreur recherche client:", error);
+  }
+};
+
+const debouncedSearchUsers = () => {
+  clearTimeout(debounceTimer.value);
+  debounceTimer.value = setTimeout(searchUsers, 300);
+};
+
+const selectUser = (user) => {
+  selectedUser.value = user;
+  userSearchResults.value = [];
+};
+
+const resetUserSelection = () => {
+  selectedUser.value = null;
+  userSearchQuery.value = "";
+};
+
+const handleCreateUser = async () => {
+  isCreatingUser.value = true;
+  try {
+    const response = await axios.post("/users", newUserForm.value);
+    toast.success(`Client "${response.data.user.name}" créé !`);
+    selectUser(response.data.user);
+    showNewUserModal.value = false;
+    newUserForm.value = { name: "", email: "", password: "" };
+  } catch (error) {
+    toast.error("Erreur: Impossible de créer le client.");
+  } finally {
+    isCreatingUser.value = false;
+  }
+};
+
+const submitReservation = async () => {
+  if (!selectedUser.value) {
+    toast.warning("Veuillez d'abord rechercher et sélectionner un client.");
+    return;
+  }
+  isSubmitting.value = true;
+  formData.value.user_id = selectedUser.value.id;
+
+  try {
+    if (editingReservation.value) {
+      await axios.put(
+        `/reservation/${editingReservation.value.id}`,
+        formData.value
+      );
+      toast.success("Réservation mise à jour avec succès !");
+    } else {
+      await axios.post("/reservation", formData.value);
+      toast.success("Réservation créée avec succès !");
+    }
+    await fetchAllData();
+    cancelForm();
+  } catch (error) {
+    toast.error(error.response?.data?.message || "Une erreur est survenue.");
+  } finally {
+    isSubmitting.value = false;
+  }
+};
+
+const cancelForm = () => {
+  showForm.value = false;
+  editingReservation.value = null;
+  resetUserSelection();
+  formData.value = {
+    user_id: "",
+    chambre_id: "",
+    date_arrive: "",
+    date_depart: ""
+  };
+  durationDays.value = 0;
+};
+
+const editReservation = (reservation) => {
+  editingReservation.value = reservation;
+  formData.value = { ...reservation };
+  selectUser(reservation.user);
+  calculateDuration();
+  showForm.value = true;
+  window.scrollTo({ top: 0, behavior: "smooth" });
+};
+
+const confirmDelete = (reservationId) => {
+  if (window.confirm("Êtes-vous sûr de vouloir annuler cette réservation ?")) {
+    deleteReservation(reservationId);
+  }
+};
+
+const deleteReservation = async (reservationId) => {
+  try {
+    await axios.delete(`/reservation/${reservationId}`);
+    toast.success("Réservation annulée.");
+    await fetchAllData();
+  } catch (error) {
+    toast.error("Erreur lors de l'annulation.");
+  }
+};
+
+const formatDate = (dateString) =>
+  new Date(dateString).toLocaleDateString("fr-FR", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric"
+  });
+
+onMounted(fetchAllData);
 </script>
 
 <style scoped>
-.transition {
-  transition: all 0.2s ease-in-out;
+.input {
+  @apply w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 transition;
+}
+.btn-primary {
+  @apply px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 transition;
+}
+.btn-secondary {
+  @apply px-4 py-2 bg-gray-200 text-gray-800 font-semibold rounded-lg hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400 disabled:opacity-50 transition;
+}
+.btn-icon-edit {
+  @apply p-2 rounded-full text-yellow-600 hover:bg-yellow-100 transition;
+}
+.btn-icon-delete {
+  @apply p-2 rounded-full text-red-600 hover:bg-red-100 transition;
 }
 
-button {
-  transition: transform 0.1s ease;
+.slide-fade-enter-active {
+  transition: all 0.3s ease-out;
 }
-
-button:active {
-  transform: scale(0.98);
+.slide-fade-leave-active {
+  transition: all 0.2s cubic-bezier(1, 0.5, 0.8, 1);
 }
-
-.hover\:bg-gray-50:hover {
-  background-color: rgba(249, 250, 251, 1);
+.slide-fade-enter-from,
+.slide-fade-leave-to {
+  transform: translateY(-10px);
+  opacity: 0;
 }
 </style>

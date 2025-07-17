@@ -16,7 +16,7 @@
 
 <script>
 
-import Navbar from './views/navbar.vue';
+import Navbar from './views/NavbarComponent.vue';
 
 import FooterVue from './views/BasBar.vue';
 

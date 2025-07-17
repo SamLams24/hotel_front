@@ -4,1190 +4,636 @@
       <!-- Header avec onglets -->
       <div class="flex flex-col mb-8">
         <h1 class="text-3xl font-bold text-gray-800 mb-2">🍹 Gestion du Bar</h1>
-        <div class="flex space-x-4 border-b border-gray-200">
-          <button 
-            v-for="(tab, index) in tabs"
-            :key="index"
+        <div class="flex space-x-1 border-b border-gray-200">
+          <button
+            v-for="tab in tabs"
+            :key="tab.id"
             @click="activeTab = tab.id"
-            :class="{
-              'border-blue-500 text-blue-600': activeTab === tab.id,
-              'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300': activeTab !== tab.id
-            }"
-            class="py-4 px-1 inline-flex items-center text-sm font-medium border-b-2"
+            :class="getTabClass(tab.id)"
           >
-            <span class="mr-2 text-lg">{{ tab.icon }}</span>
-            {{ tab.name }}
+            <span class="mr-2 text-lg">{{ tab.icon }}</span> {{ tab.name }}
           </button>
         </div>
       </div>
 
-      <!-- Section Commandes en cours -->
-      <div v-if="activeTab === 'orders'" class="mb-12">
-        <div class="flex justify-between items-center mb-6">
-          <h2 class="text-2xl font-semibold text-gray-800">📋 Commandes en cours</h2>
-          <div class="flex space-x-4">
-            <button 
-              @click="showOrderForm = true"
-              class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center"
-            >
+      <!-- Indicateur de chargement -->
+      <div v-if="isLoading" class="text-center p-10">
+        <p class="text-gray-600 animate-pulse">
+          Chargement des données du bar...
+        </p>
+      </div>
+
+      <!-- Contenu des onglets -->
+      <div v-else>
+        <!-- ======================= Section Commandes ======================= -->
+        <section v-show="activeTab === 'orders'">
+          <div class="flex justify-between items-center mb-6">
+            <h2 class="text-2xl font-semibold text-gray-800">
+              📋 Commandes en cours
+            </h2>
+            <button @click="openOrderForm()" class="btn-primary">
               ➕ Nouvelle commande
             </button>
-            <div class="relative w-64">
-              <input 
-                v-model="orderSearch"
-                type="text" 
-                placeholder="Rechercher une commande..." 
-                class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+          </div>
+          <div
+            v-if="orders.length > 0"
+            class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+          >
+            <div
+              v-for="order in orders"
+              :key="order.id"
+              class="bg-white rounded-xl shadow-md overflow-hidden transition-all duration-300 hover:shadow-lg"
+            >
+              <div
+                class="p-5 border-b border-gray-200 bg-gray-50 flex justify-between items-start"
               >
-              <div class="absolute left-3 top-2.5 text-gray-400">
-                🔍
+                <div>
+                  <h3 class="font-bold text-gray-800">
+                    Commande #{{ order.id }}
+                  </h3>
+                  <p class="text-sm text-gray-500">
+                    Chambre {{ order.room_number }}
+                  </p>
+                </div>
+                <span
+                  :class="getStatusClass(order.status)"
+                  class="px-2 py-1 text-xs font-semibold rounded-full"
+                  >{{ getStatusText(order.status) }}</span
+                >
+              </div>
+              <div class="p-5">
+                <ul class="space-y-2 mb-4">
+                  <li
+                    v-for="item in order.order_items"
+                    :key="item.id"
+                    class="flex justify-between text-sm"
+                  >
+                    <span class="text-gray-600"
+                      >{{ item.quantity }}x {{ item.menu_item.name }}</span
+                    >
+                    <span class="font-medium"
+                      >{{
+                        formatPrice(item.unit_price * item.quantity)
+                      }}
+                      FCFA</span
+                    >
+                  </li>
+                </ul>
+                <div
+                  class="mt-4 pt-4 border-t border-gray-200 flex justify-between items-center font-bold"
+                >
+                  <span>Total:</span
+                  ><span class="text-lg text-blue-600"
+                    >{{ formatPrice(order.total) }} FCFA</span
+                  >
+                </div>
+              </div>
+              <div
+                class="px-5 py-3 bg-gray-50 flex justify-end flex-wrap gap-2"
+              >
+                <button
+                  v-if="order.status === 'pending'"
+                  @click="updateOrderStatus(order.id, 'preparing')"
+                  class="btn-status-action bg-blue-600"
+                >
+                  Préparer
+                </button>
+                <button
+                  v-if="order.status === 'preparing'"
+                  @click="updateOrderStatus(order.id, 'ready')"
+                  class="btn-status-action bg-green-600"
+                >
+                  Prêt
+                </button>
+                <button
+                  v-if="order.status === 'ready'"
+                  @click="updateOrderStatus(order.id, 'delivered')"
+                  class="btn-status-action bg-purple-600"
+                >
+                  Livré
+                </button>
+                <button
+                  @click="cancelOrder(order.id)"
+                  class="btn-status-action bg-red-600"
+                >
+                  Annuler
+                </button>
               </div>
             </div>
           </div>
-        </div>
+          <div v-else class="text-center bg-white p-8 rounded-lg shadow-sm">
+            <p>Aucune commande en cours.</p>
+          </div>
+        </section>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <div 
-            v-for="order in filteredOrders" 
-            :key="order.id"
-            class="bg-white rounded-xl shadow-md overflow-hidden transition-all duration-300 hover:shadow-lg"
+        <section v-show="activeTab === 'menu'">
+          <div class="flex justify-between items-center mb-6">
+            <h2 class="text-2xl font-semibold text-gray-800">📜 Menu du Bar</h2>
+            <button @click="openItemForm()" class="btn-primary">
+              ➕ Ajouter un article
+            </button>
+          </div>
+          <div class="mb-6 flex flex-wrap gap-2">
+            <button
+              v-for="category in categories"
+              :key="category.id"
+              @click="activeCategory = category.id"
+              :class="getCategoryClass(category.id)"
+            >
+              {{ category.name }}
+            </button>
+          </div>
+          <div
+            v-if="filteredMenuItems.length > 0"
+            class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
           >
-            <div class="p-5 border-b border-gray-200 bg-gray-50">
-              <div class="flex justify-between items-start">
-                <div>
-                  <h3 class="font-bold text-gray-800">Commande #{{ order.id }}</h3>
-                  <p class="text-sm text-gray-500">Chambre {{ order.room_number }}</p>
-                </div>
-                <span :class="{
-                  'bg-yellow-100 text-yellow-800': order.status === 'pending',
-                  'bg-blue-100 text-blue-800': order.status === 'preparing',
-                  'bg-green-100 text-green-800': order.status === 'ready',
-                  'bg-purple-100 text-purple-800': order.status === 'delivered'
-                }" class="px-2 py-1 text-xs font-semibold rounded-full">
-                  {{ getStatusText(order.status) }}
-                </span>
-              </div>
-              <p class="text-sm text-gray-500 mt-2">
-                {{ formatDate(order.created_at) }}
-              </p>
-            </div>
-
-            <div class="p-5">
-              <h4 class="font-medium text-gray-700 mb-3">Articles commandés:</h4>
-              <ul class="space-y-3">
-                <li 
-                  v-for="(item, index) in order.order_items" 
-                  :key="index"
-                  class="flex justify-between"
+            <div
+              v-for="item in filteredMenuItems"
+              :key="item.id"
+              class="bg-white rounded-xl shadow-md overflow-hidden transition-all duration-300 hover:shadow-lg"
+            >
+              <div class="relative h-48 bg-gray-200">
+                <img
+                  :src="getImageUrl(item.image)"
+                  class="w-full h-full object-cover"
+                  :alt="item.name"
+                />
+                <span
+                  class="absolute top-3 right-3 px-2 py-1 bg-black bg-opacity-70 text-white text-xs font-bold rounded-full"
+                  >{{ formatPrice(item.price) }} FCFA</span
                 >
-                  <span class="text-gray-600">{{ item.quantity }}x {{ item.menu_item.name }}</span>
-                  <span class="font-medium">{{ formatPrice(item.unit_price * item.quantity) }} FCFA</span>
+              </div>
+              <div class="p-4">
+                <h3 class="text-lg font-bold text-gray-800">{{ item.name }}</h3>
+                <p class="text-sm text-gray-500 mb-2">{{ item.category }}</p>
+                <p class="text-sm text-gray-600 line-clamp-2 mb-3 h-10">
+                  {{ item.description }}
+                </p>
+                <div class="mt-4 flex justify-between">
+                  <button @click="openItemForm(item)" class="btn-icon-edit">
+                    ✏️ Modifier
+                  </button>
+                  <button
+                    @click="confirmDeleteItem(item.id)"
+                    class="btn-icon-delete"
+                  >
+                    🗑️ Supprimer
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div v-else class="text-center bg-white p-8 rounded-lg shadow-sm">
+            <p>Aucun article dans cette catégorie.</p>
+          </div>
+        </section>
+
+        <section v-show="activeTab === 'stats'">
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="bg-white p-6 rounded-xl shadow-md">
+              <div class="flex items-center">
+                <div class="p-3 rounded-full bg-blue-100 text-blue-600 mr-4">
+                  💰
+                </div>
+                <div>
+                  <p class="text-sm font-medium text-gray-500">
+                    Chiffre d'affaires (jour)
+                  </p>
+                  <p class="text-2xl font-semibold">
+                    {{ formatPrice(stats.todayRevenue) }} FCFA
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div class="bg-white p-6 rounded-xl shadow-md">
+              <div class="flex items-center">
+                <div class="p-3 rounded-full bg-green-100 text-green-600 mr-4">
+                  🍹
+                </div>
+                <div>
+                  <p class="text-sm font-medium text-gray-500">
+                    Commandes (mois)
+                  </p>
+                  <p class="text-2xl font-semibold">
+                    {{ stats.monthlyOrders }}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div class="bg-white p-6 rounded-xl shadow-md">
+              <div class="flex items-center">
+                <div
+                  class="p-3 rounded-full bg-purple-100 text-purple-600 mr-4"
+                >
+                  ⭐
+                </div>
+                <div>
+                  <p class="text-sm font-medium text-gray-500">
+                    Article Populaire
+                  </p>
+                  <p class="text-2xl font-semibold">
+                    {{ stats.topItem || "-" }}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="bg-white p-6 rounded-xl shadow-md">
+              <h3 class="text-lg font-medium text-gray-800 mb-4">
+                Articles les plus vendus
+              </h3>
+              <ul class="space-y-3">
+                <li
+                  v-for="item in stats.topItems"
+                  :key="item.name"
+                  class="flex justify-between items-center"
+                >
+                  <span class="text-gray-700">{{ item.name }}</span
+                  ><span class="font-medium bg-gray-100 px-2 py-1 rounded"
+                    >{{ item.quantity }} ventes</span
+                  >
                 </li>
               </ul>
-
-              <div class="mt-4 pt-4 border-t border-gray-200 flex justify-between items-center">
-                <span class="font-bold">Total:</span>
-                <span class="font-bold text-lg text-blue-600">
-                  {{ formatPrice(order.total) }} FCFA
-                </span>
-              </div>
             </div>
-
-            <div class="px-5 py-3 bg-gray-50 flex justify-end space-x-2">
-              <button 
-                @click="printInvoice(order)"
-                class="px-3 py-1 bg-gray-200 text-gray-700 text-sm rounded-lg hover:bg-gray-300 transition"
-              >
-                🖨️ Imprimer
-              </button>
-              <button 
-                v-if="order.status === 'pending'"
-                @click="updateOrderStatus(order.id, 'preparing')"
-                class="px-3 py-1 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition"
-              >
-                Préparer
-              </button>
-              <button 
-                v-if="order.status === 'preparing'"
-                @click="updateOrderStatus(order.id, 'ready')"
-                class="px-3 py-1 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition"
-              >
-                Prêt
-              </button>
-              <button 
-                v-if="order.status === 'ready'"
-                @click="updateOrderStatus(order.id, 'delivered')"
-                class="px-3 py-1 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 transition"
-              >
-                Livré
-              </button>
-              <button 
-                @click="cancelOrder(order.id)"
-                class="px-3 py-1 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition"
-              >
-                Annuler
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div v-if="filteredOrders.length === 0" class="bg-white rounded-xl shadow-sm p-8 text-center">
-          <p class="text-gray-500 text-lg">Aucune commande en cours</p>
-        </div>
-      </div>
-
-      <!-- Section Menu du Bar -->
-      <div v-if="activeTab === 'menu'" class="mb-12">
-        <div class="flex justify-between items-center mb-6">
-          <h2 class="text-2xl font-semibold text-gray-800">📜 Menu du Bar</h2>
-          <button 
-            @click="showItemForm = true"
-            class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition flex items-center"
-          >
-            ➕ Ajouter un article
-          </button>
-        </div>
-
-        <!-- Catégories -->
-        <div class="mb-6 flex space-x-2 overflow-x-auto pb-2">
-          <button
-            v-for="category in categories"
-            :key="category.id"
-            @click="activeCategory = category.id"
-            :class="{
-              'bg-blue-600 text-white': activeCategory === category.id,
-              'bg-white text-gray-700 hover:bg-gray-100': activeCategory !== category.id
-            }"
-            class="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition"
-          >
-            {{ category.name }}
-          </button>
-        </div>
-
-        <!-- Articles -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          <div
-            v-for="item in filteredMenuItems"
-            :key="item.id"
-            class="bg-white rounded-xl shadow-md overflow-hidden transition-all duration-300 hover:shadow-lg"
-          >
-            <div class="relative h-48 bg-gray-200">
-              <img
-                :src="item.image ? getImageUrl(item.image) : 'https://via.placeholder.com/300x200?text=Bar'"
-                class="w-full h-full object-cover"
-                :alt="item.name"
-              />
-              <span class="absolute top-3 right-3 px-2 py-1 bg-black bg-opacity-70 text-white text-xs font-bold rounded-full">
-                {{ formatPrice(item.price) }} FCFA
-              </span>
-            </div>
-            
-            <div class="p-5">
-              <h3 class="text-xl font-bold text-gray-800 mb-1">{{ item.name }}</h3>
-              <p class="text-gray-600 text-sm mb-3">{{ item.category }}</p>
-              <p class="text-gray-500 text-sm line-clamp-2 mb-3">{{ item.description }}</p>
-              
-              <div class="mt-4 flex justify-between">
-                <button 
-                  @click="editMenuItem(item)"
-                  class="px-3 py-1 bg-amber-400 text-gray-800 text-sm rounded-lg hover:bg-amber-500 transition"
+            <div class="bg-white p-6 rounded-xl shadow-md">
+              <h3 class="text-lg font-medium text-gray-800 mb-4">
+                Dernières commandes
+              </h3>
+              <ul class="space-y-3">
+                <li
+                  v-for="order in stats.recentOrders"
+                  :key="order.id"
+                  class="flex justify-between items-center"
                 >
-                  ✏️ Modifier
-                </button>
-                <button 
-                  @click="confirmDeleteItem(item.id)"
-                  class="px-3 py-1 bg-red-500 text-white text-sm rounded-lg hover:bg-red-600 transition"
-                >
-                  🗑️ Supprimer
-                </button>
-              </div>
+                  <div>
+                    <p class="text-gray-700">Commande #{{ order.id }}</p>
+                    <p class="text-sm text-gray-500">
+                      {{ formatDate(order.date) }}
+                    </p>
+                  </div>
+                  <span class="font-medium"
+                    >{{ formatPrice(order.total) }} FCFA</span
+                  >
+                </li>
+              </ul>
             </div>
           </div>
-        </div>
-
-        <div v-if="filteredMenuItems.length === 0" class="bg-white rounded-xl shadow-sm p-8 text-center">
-          <p class="text-gray-500 text-lg">Aucun article dans cette catégorie</p>
-          <button 
-            @click="showItemForm = true"
-            class="mt-4 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
-          >
-            ➕ Ajouter votre premier article
-          </button>
-        </div>
+        </section>
       </div>
-
-      <!-- Section Statistiques -->
-      <div v-if="activeTab === 'stats'" class="mb-12">
-        <h2 class="text-2xl font-semibold text-gray-800 mb-6">📊 Statistiques du Bar</h2>
-        
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div class="bg-white p-6 rounded-xl shadow-md">
-            <div class="flex items-center">
-              <div class="p-3 rounded-full bg-blue-100 text-blue-600 mr-4">
-                <span class="text-2xl">💰</span>
-              </div>
-              <div>
-                <p class="text-sm font-medium text-gray-500">Chiffre d'affaires (aujourd'hui)</p>
-                <p class="text-2xl font-semibold">{{ formatPrice(stats.todayRevenue) }} FCFA</p>
-              </div>
-            </div>
-          </div>
-          
-          <div class="bg-white p-6 rounded-xl shadow-md">
-            <div class="flex items-center">
-              <div class="p-3 rounded-full bg-green-100 text-green-600 mr-4">
-                <span class="text-2xl">🍹</span>
-              </div>
-              <div>
-                <p class="text-sm font-medium text-gray-500">Commandes (ce mois)</p>
-                <p class="text-2xl font-semibold">{{ stats.monthlyOrders }}</p>
-              </div>
-            </div>
-          </div>
-          
-          <div class="bg-white p-6 rounded-xl shadow-md">
-            <div class="flex items-center">
-              <div class="p-3 rounded-full bg-purple-100 text-purple-600 mr-4">
-                <span class="text-2xl">⭐</span>
-              </div>
-              <div>
-                <p class="text-sm font-medium text-gray-500">Article populaire</p>
-                <p class="text-2xl font-semibold">{{ stats.topItem || '-' }}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="bg-white p-6 rounded-xl shadow-md mb-8">
-          <h3 class="text-lg font-medium text-gray-800 mb-4">Ventes par catégorie</h3>
-          <div class="h-64">
-            <div class="flex items-center justify-center h-full bg-gray-100 rounded-lg">
-              <p class="text-gray-500">Graphique des ventes par catégorie</p>
-            </div>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div class="bg-white p-6 rounded-xl shadow-md">
-            <h3 class="text-lg font-medium text-gray-800 mb-4">Articles les plus vendus</h3>
-            <ul class="space-y-3">
-              <li 
-                v-for="(item, index) in stats.topItems" 
-                :key="index"
-                class="flex justify-between items-center"
-              >
-                <span class="text-gray-700">{{ index + 1 }}. {{ item.name }}</span>
-                <span class="font-medium">{{ item.quantity }} ventes</span>
-              </li>
-            </ul>
-          </div>
-          
-          <div class="bg-white p-6 rounded-xl shadow-md">
-            <h3 class="text-lg font-medium text-gray-800 mb-4">Dernières commandes</h3>
-            <ul class="space-y-3">
-              <li 
-                v-for="order in stats.recentOrders" 
-                :key="order.id"
-                class="flex justify-between items-center"
-              >
-                <div>
-                  <p class="text-gray-700">#{{ order.id }}</p>
-                  <p class="text-sm text-gray-500">{{ formatShortDate(order.date) }}</p>
-                </div>
-                <span class="font-medium">{{ formatPrice(order.total) }} FCFA</span>
-              </li>
-            </ul>
-          </div>
-        </div>
-      </div>
-
-      <!-- Formulaire d'ajout/modification d'article -->
-      <transition name="modal">
-        <div v-if="showItemForm" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
-          <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div class="p-6">
-              <div class="flex justify-between items-center mb-4">
-                <h3 class="text-xl font-semibold text-gray-800">
-                  {{ editingItem ? '✏️ Modifier Article' : '➕ Nouvel Article' }}
-                </h3>
-                <button @click="closeItemForm" class="text-gray-400 hover:text-gray-500">
-                  <span class="text-2xl">×</span>
-                </button>
-              </div>
-
-              <form @submit.prevent="submitItemForm" class="space-y-4">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Nom</label>
-                    <input
-                      v-model="itemForm.name"
-                      type="text"
-                      placeholder="Ex: Mojito"
-                      class="input"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Catégorie</label>
-                    <select
-                      v-model="itemForm.category_id"
-                      class="input"
-                      required
-                    >
-                      <option value="">Sélectionnez une catégorie</option>
-                      <option v-for="category in categories" :key="category.id" :value="category.id">
-                        {{ category.name }}
-                      </option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Prix (FCFA)</label>
-                    <input
-                      v-model="itemForm.price"
-                      type="number"
-                      min="0"
-                      placeholder="Ex: 5000"
-                      class="input"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Disponibilité</label>
-                    <select
-                      v-model="itemForm.available"
-                      class="input"
-                      required
-                    >
-                      <option :value="true">Disponible</option>
-                      <option :value="false">Non disponible</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                  <textarea
-                    v-model="itemForm.description"
-                    rows="3"
-                    class="input"
-                    placeholder="Description de l'article..."
-                  ></textarea>
-                </div>
-
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-2">Image</label>
-                  <div 
-                    class="border-2 border-dashed border-gray-300 rounded-lg p-4 flex flex-col items-center cursor-pointer hover:bg-gray-50 transition"
-                    @click="$refs.itemFileInput.click()"
-                  >
-                    <input 
-                      type="file" 
-                      ref="itemFileInput"
-                      @change="handleItemImageUpload"
-                      accept="image/*"
-                      class="hidden"
-                    >
-                    <div v-if="!itemForm.image && !itemImagePreview" class="text-center">
-                      <span class="text-5xl mb-2 block">🖼️</span>
-                      <p class="text-gray-500">Cliquez pour sélectionner une image</p>
-                      <p class="text-sm text-gray-400 mt-2">Formats acceptés: JPG, PNG (max 2MB)</p>
-                    </div>
-                    <div v-else class="relative w-full max-w-md">
-                      <img
-                        :src="itemImagePreview || getImageUrl(itemForm.image)"
-                        class="max-h-48 w-full object-cover rounded-md"
-                        alt="Aperçu de l'article"
-                      />
-                      <button
-                        type="button"
-                        @click.stop="removeItemImage"
-                        class="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition"
-                      >
-                        ❌
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="pt-4 flex justify-end gap-4">
-                  <button 
-                    type="button" 
-                    @click="closeItemForm"
-                    class="btn-cancel"
-                  >
-                    Annuler
-                  </button>
-                  <button 
-                    type="submit"
-                    class="btn-submit"
-                    :disabled="isSubmittingItem"
-                  >
-                    <span v-if="isSubmittingItem">Enregistrement...</span>
-                    <span v-else>{{ editingItem ? 'Mettre à jour' : 'Ajouter l\'article' }}</span>
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      </transition>
-
-      <!-- Modal Nouvelle Commande -->
-      <transition name="modal">
-        <div v-if="showOrderForm" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
-          <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div class="p-6">
-              <div class="flex justify-between items-center mb-4">
-                <h3 class="text-xl font-semibold text-gray-800">➕ Nouvelle Commande</h3>
-                <button @click="closeOrderForm" class="text-gray-400 hover:text-gray-500">
-                  <span class="text-2xl">×</span>
-                </button>
-              </div>
-
-              <form @submit.prevent="submitOrderForm" class="space-y-4">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Numéro de chambre</label>
-                    <input
-                      v-model="orderForm.room_number"
-                      type="number"
-                      min="0"
-                      class="input"
-                      required
-                      placeholder="Entrez le numéro de chambre"
-                    />
-                  </div>
-
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Statut</label>
-                    <select
-                      v-model="orderForm.status"
-                      class="input"
-                      required
-                    >
-                      <option value="pending">En attente</option>
-                      <option value="preparing">En préparation</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-2">Articles</label>
-                  <div class="space-y-4">
-                    <div v-for="(item, index) in orderForm.items" :key="index" class="flex items-end space-x-4">
-                      <div class="flex-1">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Article</label>
-                        <select
-                          v-model="item.menu_item_id"
-                          class="input"
-                          required
-                          @change="updateSelectedItem(index)"
-                        >
-                          <option value="">Sélectionnez un article</option>
-                          <option v-for="menuItem in availableMenuItems" :key="menuItem.id" :value="menuItem.id">
-                            {{ menuItem.name }} - {{ formatPrice(menuItem.price) }} FCFA
-                          </option>
-                        </select>
-                      </div>
-                      <div class="w-24">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Quantité</label>
-                        <input
-                          v-model.number="item.quantity"
-                          type="number"
-                          min="1"
-                          class="input"
-                          required
-                        />
-                      </div>
-                      <div class="w-24">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Prix unitaire</label>
-                        <input
-                          v-model.number="item.unit_price"
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          class="input"
-                          required
-                          disabled
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        @click="removeOrderItem(index)"
-                        class="p-2 text-red-500 hover:text-red-700"
-                        :disabled="orderForm.items.length <= 1"
-                      >
-                        ❌
-                      </button>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    @click="addOrderItem"
-                    class="mt-2 px-3 py-1 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm"
-                  >
-                    ➕ Ajouter un article
-                  </button>
-                </div>
-
-                <div class="pt-4 border-t border-gray-200">
-                  <div class="flex justify-between items-center mb-4">
-                    <span class="font-bold">Total:</span>
-                    <span class="font-bold text-lg text-blue-600">
-                      {{ formatPrice(calculateOrderTotal) }} FCFA
-                    </span>
-                  </div>
-                </div>
-
-                <div class="pt-4 flex justify-end gap-4">
-                  <button 
-                    type="button" 
-                    @click="closeOrderForm"
-                    class="btn-cancel"
-                  >
-                    Annuler
-                  </button>
-                  <button 
-                    type="submit"
-                    class="btn-submit"
-                    :disabled="isSubmittingOrder"
-                  >
-                    <span v-if="isSubmittingOrder">Enregistrement...</span>
-                    <span v-else>Créer la commande</span>
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      </transition>
-
-      <!-- Modal de confirmation de suppression -->
-      <transition name="modal">
-        <div v-if="showDeleteModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
-          <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
-            <div class="flex items-start">
-              <div class="flex-shrink-0 h-10 w-10 bg-red-100 rounded-full flex items-center justify-center text-red-600 mr-4">
-                ❗
-              </div>
-              <div>
-                <h3 class="text-lg font-medium text-gray-900">Confirmer la suppression</h3>
-                <p class="mt-2 text-sm text-gray-500">
-                  Êtes-vous sûr de vouloir supprimer cet article ? Cette action est irréversible.
-                </p>
-              </div>
-            </div>
-            <div class="mt-6 flex justify-end gap-3">
-              <button 
-                @click="showDeleteModal = false" 
-                class="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition"
-              >
-                Annuler
-              </button>
-              <button 
-                @click="deleteMenuItem" 
-                class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
-              >
-                Confirmer
-              </button>
-            </div>
-          </div>
-        </div>
-      </transition>
     </div>
+
+    <transition name="modal-fade">
+      <div
+        v-if="showItemForm"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 p-4"
+      >
+        <div
+          class="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+        >
+          <form @submit.prevent="submitItemForm" class="p-6">
+            <h3 class="text-xl font-semibold text-gray-800 mb-6">
+              {{ itemForm.id ? "✏️ Modifier Article" : "➕ Nouvel Article" }}
+            </h3>
+            <div class="space-y-4">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <input
+                  v-model="itemForm.name"
+                  placeholder="Nom de l'article"
+                  class="input"
+                  required
+                />
+                <select v-model="itemForm.category" class="input" required>
+                  <option value="" disabled>Catégorie</option>
+                  <option
+                    v-for="cat in categories"
+                    :key="cat.id"
+                    :value="cat.name"
+                  >
+                    {{ cat.name }}
+                  </option>
+                </select>
+                <input
+                  v-model.number="itemForm.price"
+                  type="number"
+                  placeholder="Prix"
+                  class="input"
+                  required
+                />
+                <select v-model="itemForm.available" class="input" required>
+                  <option :value="true">Disponible</option>
+                  <option :value="false">Indisponible</option>
+                </select>
+              </div>
+              <textarea
+                v-model="itemForm.description"
+                placeholder="Description"
+                rows="3"
+                class="input"
+              ></textarea>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2"
+                  >Image</label
+                ><input
+                  type="file"
+                  @change="handleItemImageUpload"
+                  accept="image/*"
+                  class="text-sm"
+                />
+              </div>
+            </div>
+            <div class="pt-6 flex justify-end gap-4">
+              <button
+                type="button"
+                @click="showItemForm = false"
+                class="btn-secondary"
+              >
+                Annuler
+              </button>
+              <button
+                type="submit"
+                class="btn-primary"
+                :disabled="isSubmittingItem"
+              >
+                {{ itemForm.id ? "Mettre à jour" : "Ajouter" }}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </transition>
+
+    <transition name="modal-fade">
+      <div
+        v-if="showDeleteModal"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 p-4"
+      >
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md p-6">
+          <h3 class="text-lg font-medium text-gray-900">
+            Confirmer la suppression
+          </h3>
+          <p class="mt-2 text-sm text-gray-500">
+            Êtes-vous sûr de vouloir supprimer cet article ? Cette action est
+            irréversible.
+          </p>
+          <div class="mt-6 flex justify-end gap-3">
+            <button @click="showDeleteModal = false" class="btn-secondary">
+              Annuler
+            </button>
+            <button
+              @click="deleteMenuItem"
+              class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition"
+            >
+              Confirmer
+            </button>
+          </div>
+        </div>
+      </div>
+    </transition>
   </div>
 </template>
 
-<script>
+<script setup>
+import { ref, onMounted, computed } from "vue";
 import axios from "axios";
 import { useToast } from "vue-toastification";
-import { ref } from "vue";
-import { toRaw } from 'vue';
+
+const toast = useToast();
+const isLoading = ref(true);
+const activeTab = ref("orders");
+const orders = ref([]);
+const menuItems = ref([]);
+const categories = ref([]);
+const stats = ref({});
+const activeCategory = ref(null);
+
+const showItemForm = ref(false);
+const isSubmittingItem = ref(false);
+const itemForm = ref({});
+const itemImageFile = ref(null);
+
+const showDeleteModal = ref(false);
+const itemToDelete = ref(null);
+
+const filteredMenuItems = computed(() => {
+  if (!activeCategory.value) return menuItems.value;
+  const category = categories.value.find((c) => c.id === activeCategory.value);
+  return category
+    ? menuItems.value.filter((item) => item.category === category.name)
+    : [];
+});
 /* eslint-disable */
-export default {
-  setup() {
-    const toast = useToast();
-    return { toast };
-  },
-  data() {
-    return {
-      activeTab: 'orders',
-      tabs: [
-        { id: 'orders', name: 'Commandes', icon: '📋' },
-        { id: 'menu', name: 'Menu', icon: '📜' },
-        { id: 'stats', name: 'Statistiques', icon: '📊' }
-      ],
-      
-      // Commandes
-      orderSearch: '',
-      orders: [],
-      showOrderForm: false,
-      isSubmittingOrder: false,
-      orderForm: {
-        room_number: null,
-        status: 'pending',
-        items: [
-          {
-            menu_item_id: '',
-            quantity: 1,
-            unit_price: 0
-          }
-        ]
-      },
-      
-      // Menu
-      activeCategory: null,
-      categories: [],
-      menuItems: [],
+const availableMenuItems = computed(() =>
+  menuItems.value.filter((item) => item.available)
+);
 
-      itemImagePreview: null,
+const tabs = [
+  { id: "orders", name: "Commandes", icon: "📋" },
+  { id: "menu", name: "Menu", icon: "📜" },
+  { id: "stats", name: "Statistiques", icon: "📊" }
+];
+const getTabClass = (tabId) => ({
+  "border-blue-600 text-blue-600": activeTab.value === tabId,
+  "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300":
+    activeTab.value !== tabId,
+  "py-3 px-4 inline-flex items-center text-sm font-semibold border-b-2 transition-colors duration-200 focus:outline-none": true
+});
+const getCategoryClass = (catId) => ({
+  "bg-blue-600 text-white": activeCategory.value === catId,
+  "bg-white text-gray-700 hover:bg-gray-100": activeCategory.value !== catId,
+  "px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition shadow-sm": true
+});
 
-      // Statistiques
-      stats: {
-        todayRevenue: 0,
-        monthlyOrders: 0,
-        topItem: '',
-        topItems: [],
-        recentOrders: []
-      },
+onMounted(async () => {
+  isLoading.value = true;
+  try {
+    await Promise.all([
+      fetchOrders(),
+      fetchMenuItems(),
+      fetchCategories(),
+      fetchStats()
+    ]);
+  } catch (error) {
+    toast.error("Erreur de chargement des données du bar.");
+  } finally {
+    isLoading.value = false;
+  }
+});
 
-      // Gestion des formulaires
-      showItemForm: false,
-      editingItem: null,
-      itemForm: {
-        name: '',
-        category_id: '',
-        price: 0,
-        description: '',
-        available: true,
-        image: null
-      },
-      itemImageFile: null,
+async function fetchOrders() {
+  orders.value = (await axios.get("/orders")).data.data;
+}
+async function fetchMenuItems() {
+  menuItems.value = (await axios.get("/menu-items")).data;
+}
+async function fetchCategories() {
+  categories.value = (await axios.get("/categories")).data;
+  if (categories.value.length > 0 && !activeCategory.value) {
+    activeCategory.value = categories.value[0].id;
+  }
+}
+async function fetchStats() {
+  stats.value = (await axios.get("/bar-stats")).data;
+}
 
-      showDeleteModal: false,
-      itemToDelete: null,
-      isSubmittingItem: false
-    };
-  },
-  computed: {
-    filteredOrders() {
-      const query = this.orderSearch.toLowerCase();
-      return this.orders.filter(order => 
-        order.id.toString().includes(query) ||
-        (order.room_number && order.room_number.toString().includes(query)) ||
-        order.order_items.some(item => item.menu_item.name.toLowerCase().includes(query))
-      );
-    },
-    filteredMenuItems() {
-      if (!this.activeCategory) return this.menuItems;
-      const category = this.categories.find(c => String(c.id) === String(this.activeCategory));
-      if (!category) return this.menuItems;
-      return this.menuItems.filter(item => item.category === category.name);
-    },
-    availableMenuItems() {
-      return this.menuItems.filter(item => item.available);
-    },
-    calculateOrderTotal() {
-      return this.orderForm.items.reduce((total, item) => {
-        return total + (item.unit_price * item.quantity);
-      }, 0);
-    }
-  },
-  async created() {
-    await this.fetchCategories();
-    await this.fetchMenuItems();
-    await this.fetchOrders();
-    await this.fetchStats();
-  },
-  methods: {
-    // API Configuration
-    getApiBaseUrl() {
-      return process.env.VUE_APP_API_URL || 'http://localhost:8000/api';
-    },
-    
-    getAuthHeader() {
-      const token = localStorage.getItem('token');
-      return {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      };
-    },
-    
-    getImageUrl(imagePath) {
-      if (!imagePath) return '';
-      if (imagePath.startsWith('http')) return imagePath;
-      return `${this.getApiBaseUrl().replace('/api', '')}/storage/${imagePath}`;
-    },
-    
-    // Commandes API
-    async fetchOrders() {
-      try {
-        const response = await axios.get(`${this.getApiBaseUrl()}/orders`, {
-          headers: this.getAuthHeader()
-        });
-        this.orders = response.data.data || response.data;
-      } catch (error) {
-        console.error("Erreur lors de la récupération des commandes:", error);
-        this.toast.error(error.response?.data?.message || "Erreur lors de la récupération des commandes");
-        this.orders = [];
-      }
-    },
-    
-    async createOrder(orderData) {
-      try {
-        const response = await axios.post(
-          `${this.getApiBaseUrl()}/orders`,
-          orderData,
-          { headers: this.getAuthHeader() }
-        );
-        return response.data;
-      } catch (error) {
-        console.error("Erreur création commande:", error);
-        this.toast.error(error.response?.data?.message || "Erreur lors de la création");
-        throw error;
-      }
-    },
-    
-    async updateOrderStatus(orderId, status) {
-      try {
-        await axios.put(
-          `${this.getApiBaseUrl()}/orders/${orderId}/status`,
-          { status },
-          { headers: this.getAuthHeader() }
-        );
-        await this.fetchOrders();
-        this.toast.success("Statut de commande mis à jour");
-      } catch (error) {
-        console.error("Erreur lors de la mise à jour du statut:", error);
-        this.toast.error(error.response?.data?.message || "Erreur lors de la mise à jour du statut");
-      }
-    },
-    
-    async cancelOrder(orderId) {
-      try {
-        await axios.delete(
-          `${this.getApiBaseUrl()}/orders/${orderId}`,
-          { headers: this.getAuthHeader() }
-        );
-        await this.fetchOrders();
-        this.toast.success("Commande annulée");
-      } catch (error) {
-        console.error("Erreur lors de l'annulation de la commande:", error);
-        this.toast.error(error.response?.data?.message || "Erreur lors de l'annulation de la commande");
-      }
-    },
-    
-    // Menu API
-    async fetchMenuItems() {
-      try {
-        const response = await axios.get(`${this.getApiBaseUrl()}/menu-items`, {
-          headers: this.getAuthHeader()
-        });
-        this.menuItems = response.data.data || response.data;
-      } catch (error) {
-        console.error("Erreur lors de la récupération du menu:", error);
-        this.toast.error(error.response?.data?.message || "Erreur lors de la récupération du menu");
-        this.menuItems = [];
-      }
-    },
-    
-    async fetchCategories() {
-      try {
-        const response = await axios.get(`${this.getApiBaseUrl()}/categories`, {
-          headers: this.getAuthHeader()
-        });
-        this.categories = response.data.data || response.data;
-        if (this.categories.length > 0 && !this.activeCategory) {
-          this.activeCategory = this.categories[0].id;
-        }
-      } catch (error) {
-        console.error("Erreur lors de la récupération des catégories:", error);
-        this.toast.error(error.response?.data?.message || "Erreur lors de la récupération des catégories");
-        this.categories = [];
-      }
-    },
-    
-    async submitItemForm() {
-      this.isSubmittingItem = true;
-      try {
-        const formData = new FormData();
-        formData.append('name', this.itemForm.name);
-
-        const selectedCategory = this.categories.find(
-          c => String(c.id) === String(this.itemForm.category_id)
-        );
-        const categoryName = selectedCategory ? selectedCategory.name : '';
-        formData.append('category', categoryName);
-
-        formData.append('price', this.itemForm.price);
-        formData.append('description', this.itemForm.description || '');
-        formData.append('available', this.itemForm.available ? '1' : '0');
-        if (this.itemImageFile) {
-          formData.append('image', this.itemImageFile);
-        } else if (this.itemForm.image && typeof this.itemForm.image === 'string') {
-          formData.append('image', this.itemForm.image);
-        }
-
-        console.log("Données envoyées:", {
-          name: this.itemForm.name,
-          category: categoryName,
-          price: this.itemForm.price,
-          description: this.itemForm.description,
-          available: this.itemForm.available,
-          image: this.itemImageFile || this.itemForm.image
-        });
-
-        if (this.editingItem) {
-          await axios.put(
-            `${this.getApiBaseUrl()}/menu-items/${this.editingItem}`,
-            formData,
-            {
-              headers: {
-                ...this.getAuthHeader(),
-              }
-            }
-          );
-          this.toast.success("Article mis à jour");
-        } else {
-          await axios.post(
-            `${this.getApiBaseUrl()}/menu-items`,
-            formData,
-            {
-              headers: {
-                ...this.getAuthHeader(),
-              }
-            }
-          );
-          this.toast.success("Article ajouté");
-        }
-
-        await this.fetchMenuItems();
-        this.closeItemForm();
-      } catch (error) {
-        console.error("Erreur lors de l'enregistrement:", error);
-        console.error("Détail de l'erreur:", error.response?.data);
-        this.toast.error(error?.response?.data?.message || "Erreur lors de l'enregistrement");
-      } finally {
-        this.isSubmittingItem = false;
-      }
-    },
-    
-    async deleteMenuItem() {
-      try {
-        await axios.delete(
-          `${this.getApiBaseUrl()}/menu-items/${this.itemToDelete}`,
-          { headers: this.getAuthHeader() }
-        );
-        await this.fetchMenuItems();
-        this.showDeleteModal = false;
-        this.toast.success("Article supprimé");
-      } catch (error) {
-        console.error("Erreur lors de la suppression:", error);
-        this.toast.error(error.response?.data?.message || "Erreur lors de la suppression");
-      }
-    },
-    
-    // Statistiques API
-    async fetchStats() {
-      try {
-        const response = await axios.get(`${this.getApiBaseUrl()}/bar-stats`, {
-          headers: this.getAuthHeader()
-        });
-        this.stats = response.data.data || response.data;
-      } catch (error) {
-        console.error("Erreur lors de la récupération des stats:", error);
-        this.toast.error(error.response?.data?.message || "Erreur lors de la récupération des statistiques");
-        this.stats = {
-          todayRevenue: 0,
-          monthlyOrders: 0,
-          topItem: '',
-          topItems: [],
-          recentOrders: []
-        };
-      }
-    },
-    
-    // Gestion des commandes
-    addOrderItem() {
-      this.orderForm.items.push({
-        menu_item_id: '',
-        quantity: 1,
-        unit_price: 0
-      });
-    },
-    
-    removeOrderItem(index) {
-      if (this.orderForm.items.length > 1) {
-        this.orderForm.items.splice(index, 1);
-      }
-    },
-    
-    updateSelectedItem(index) {
-      const selectedItem = this.availableMenuItems.find(item => item.id == this.orderForm.items[index].menu_item_id);
-      if (selectedItem) {
-        this.orderForm.items[index].unit_price = selectedItem.price;
-      } else {
-        this.orderForm.items[index].unit_price = 0;
-      }
-    },
-    
-    async submitOrderForm() {
-      this.isSubmittingOrder = true;
-      try {
-        const orderData = {
-          room_number: this.orderForm.room_number,
-          status: this.orderForm.status,
-          items: this.orderForm.items.map(item => ({
-            menu_item_id: item.menu_item_id,
-            quantity: item.quantity,
-            unit_price: item.unit_price
-          })),
-          total: this.calculateOrderTotal
-        };
-        
-        await this.createOrder(orderData);
-        this.toast.success("Commande créée avec succès");
-        this.closeOrderForm();
-        await this.fetchOrders();
-      } catch (error) {
-        console.error("Erreur création commande:", error);
-        this.toast.error(error.response?.data?.message || "Erreur création commande");
-      } finally {
-        this.isSubmittingOrder = false;
-      }
-    },
-    
-    closeOrderForm() {
-      this.showOrderForm = false;
-      this.orderForm = {
-        room_number: null,
-        status: 'pending',
-        items: [
-          {
-            menu_item_id: '',
-            quantity: 1,
-            unit_price: 0
-          }
-        ]
-      };
-    },
-    
-    // Impression de facture
-    printInvoice(order) {
-      const printWindow = window.open('', '_blank');
-      
-      const htmlContent = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Facture #${order.id}</title>
-          <style>
-            body { font-family: Arial, sans-serif; margin: 20px; }
-            h1 { color: #333; }
-            table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-            th { background-color: #f2f2f2; }
-            .total { font-weight: bold; font-size: 1.2em; }
-            .header { display: flex; justify-content: space-between; }
-            .info { margin-bottom: 20px; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <h1>Facture #${order.id}</h1>
-            <p>Date: ${this.formatDate(order.created_at)}</p>
-          </div>
-          
-          <div class="info">
-            <p><strong>Chambre:</strong> ${order.room_number}</p>
-            <p><strong>Statut:</strong> ${this.getStatusText(order.status)}</p>
-          </div>
-          
-          <table>
-            <thead>
-              <tr>
-                <th>Article</th>
-                <th>Quantité</th>
-                <th>Prix unitaire</th>
-                <th>Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${order.order_items.map(item => `
-                <tr>
-                  <td>${item.menu_item.name}</td>
-                  <td>${item.quantity}</td>
-                  <td>${this.formatPrice(item.unit_price)} FCFA</td>
-                  <td>${this.formatPrice(item.unit_price * item.quantity)} FCFA</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-          
-          <div class="total">
-            <p>Total: ${this.formatPrice(order.total)} FCFA</p>
-          </div>
-          
-          <script>
-            window.onload = function() {
-              setTimeout(function() {
-                window.print();
-                window.close();
-              }, 200);
-            }
-          <\/script>
-        </body>
-        </html>
-      `;
-
-      printWindow.document.open();
-      printWindow.document.write(htmlContent);
-      printWindow.document.close();
-    },
-
-    editMenuItem(item) {
-      this.editingItem = item.id;
-      this.itemForm = {
-        ...item,
-        category_id: item.category_id || item.category?.id
-      };
-      this.showItemForm = true;
-    },
-    
-    handleItemImageUpload(event) {
-      const file = event.target.files[0];
-      if (!file) return;
-
-      if (!file.type.match('image.*')) {
-        this.toast.error("Veuillez sélectionner une image valide (JPG, PNG)");
-        return;
-      }
-
-      if (file.size > 2 * 1024 * 1024) {
-        this.toast.error("La taille de l'image ne doit pas dépasser 2MB");
-        return;
-      }
-
-      this.itemImageFile = file;
-      
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        this.itemImagePreview = e.target.result;
-      };
-      reader.readAsDataURL(file);
-    },
-    
-    removeItemImage() {
-      this.itemForm.image = null;
-      this.itemImageFile = null;
-      this.itemImagePreview = null;
-      if (this.$refs.itemFileInput) this.$refs.itemFileInput.value = '';
-    },
-    
-    closeItemForm() {
-      this.showItemForm = false;
-      this.editingItem = null;
-      this.itemForm = {
-        name: '',
-        category_id: '',
-        price: 0,
-        description: '',
-        available: true,
-        image: null
-      };
-      this.itemImageFile = null;
-      this.itemImagePreview = null;
-      if (this.$refs.itemFileInput) this.$refs.itemFileInput.value = '';
-    },
-    
-    confirmDeleteItem(itemId) {
-      this.itemToDelete = itemId;
-      this.showDeleteModal = true;
-    },
-    
-    getStatusText(status) {
-      const statusMap = {
-        pending: 'En attente',
-        preparing: 'En préparation',
-        ready: 'Prêt à servir',
-        delivered: 'Livré'
-      };
-      return statusMap[status] || status;
-    },
-    
-    // Utilitaires
-    formatPrice(price) {
-      return new Intl.NumberFormat('fr-FR').format(price);
-    },
-    
-    formatDate(date) {
-      if (!date) return '';
-      return new Date(date).toLocaleString('fr-FR', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-    },
-    
-    formatShortDate(date) {
-      if (!date) return '';
-      return new Date(date).toLocaleString('fr-FR', {
-        hour: '2-digit',
-        minute: '2-digit'
-      });
+async function updateOrderStatus(orderId, status) {
+  try {
+    await axios.put(`/orders/${orderId}/status`, { status });
+    await fetchOrders();
+    toast.success(`Commande #${orderId} mise à jour.`);
+  } catch {
+    toast.error("Erreur lors de la mise à jour du statut.");
+  }
+}
+async function cancelOrder(orderId) {
+  if (confirm("Êtes-vous sûr de vouloir annuler cette commande ?")) {
+    try {
+      await axios.delete(`/orders/${orderId}`);
+      await fetchOrders();
+      toast.success(`Commande #${orderId} annulée.`);
+    } catch {
+      toast.error("Erreur d'annulation.");
     }
   }
-};
+}
+
+function openItemForm(item = null) {
+  itemImageFile.value = null;
+  if (item) {
+    itemForm.value = { ...item, available: !!item.available };
+  } else {
+    itemForm.value = {
+      name: "",
+      category: "",
+      price: null,
+      description: "",
+      available: true
+    };
+  }
+  showItemForm.value = true;
+}
+
+function handleItemImageUpload(event) {
+  const file = event.target.files[0];
+  if (file && file.type.startsWith("image/")) {
+    itemImageFile.value = file;
+  } else {
+    toast.warning("Veuillez sélectionner un fichier image valide.");
+  }
+}
+
+async function submitItemForm() {
+  isSubmittingItem.value = true;
+  const formData = new FormData();
+  Object.keys(itemForm.value).forEach((key) => {
+    if (key === "available")
+      formData.append(key, itemForm.value[key] ? "1" : "0");
+    else if (itemForm.value[key] !== null)
+      formData.append(key, itemForm.value[key]);
+  });
+  if (itemImageFile.value) {
+    formData.append("image", itemImageFile.value);
+  }
+  if (itemForm.value.id) formData.append("_method", "PUT");
+
+  const url = itemForm.value.id
+    ? `/menu-items/${itemForm.value.id}`
+    : "/menu-items";
+  const method = itemForm.value.id ? "post" : "post";
+
+  try {
+    await axios[method](url, formData, {
+      headers: { "Content-Type": "multipart/form-data" }
+    });
+    toast.success(`Article ${itemForm.value.id ? "mis à jour" : "créé"} !`);
+    showItemForm.value = false;
+    await fetchMenuItems();
+  } catch (error) {
+    toast.error("Erreur lors de l'enregistrement de l'article.");
+    console.error(error.response?.data);
+  } finally {
+    isSubmittingItem.value = false;
+  }
+}
+
+function confirmDeleteItem(id) {
+  itemToDelete.value = id;
+  showDeleteModal.value = true;
+}
+
+async function deleteMenuItem() {
+  try {
+    await axios.delete(`/menu-items/${itemToDelete.value}`);
+    toast.success("Article supprimé.");
+    showDeleteModal.value = false;
+    await fetchMenuItems();
+  } catch {
+    toast.error("Erreur lors de la suppression.");
+  }
+}
+
+// --- Utility Functions ---
+const formatPrice = (price) =>
+  !isNaN(price) ? new Intl.NumberFormat("fr-FR").format(price) : "0";
+const formatDate = (date) =>
+  date
+    ? new Date(date).toLocaleString("fr-FR", {
+        day: "2-digit",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit"
+      })
+    : "";
+const getImageUrl = (path) =>
+  path
+    ? `http://localhost:8000/storage/${path}`
+    : "https://via.placeholder.com/300x200?text=Bar";
+const getStatusText = (status) =>
+  ({
+    pending: "En attente",
+    preparing: "En préparation",
+    ready: "Prêt",
+    delivered: "Livré"
+  }[status] || "Inconnu");
+const getStatusClass = (status) => ({
+  "bg-yellow-100 text-yellow-800": status === "pending",
+  "bg-blue-100 text-blue-800": status === "preparing",
+  "bg-green-100 text-green-800": status === "ready",
+  "bg-purple-100 text-purple-800": status === "delivered"
+});
 </script>
 
 <style scoped>
-/* Styles de base */
 .input {
-  @apply w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none transition duration-200;
+  @apply w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 transition;
 }
-
-.btn-submit {
-  @apply px-5 py-2.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed;
+.btn-primary {
+  @apply px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 disabled:opacity-50 transition;
 }
-
-.btn-cancel {
-  @apply px-5 py-2.5 bg-white border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-all duration-200 shadow-sm;
+.btn-secondary {
+  @apply px-4 py-2 bg-gray-200 text-gray-800 font-semibold rounded-lg hover:bg-gray-300 disabled:opacity-50 transition;
 }
-
-/* Animations */
-.modal-enter-active,
-.modal-leave-active {
-  transition: opacity 0.3s ease;
+.btn-icon-edit {
+  @apply px-3 py-1 text-sm bg-yellow-100 text-yellow-800 rounded-md hover:bg-yellow-200;
 }
-
-.modal-enter-from,
-.modal-leave-to {
-  opacity: 0;
+.btn-icon-delete {
+  @apply px-3 py-1 text-sm bg-red-100 text-red-800 rounded-md hover:bg-red-200;
 }
-
-/* Effets au survol */
-button {
-  @apply transform hover:scale-[1.02] active:scale-95 transition-transform;
+.btn-status-action {
+  @apply text-white text-xs font-semibold rounded-md px-2 py-1 hover:opacity-90;
 }
-
-/* Zone de dépôt de fichier */
-.border-dashed {
-  @apply transition-colors duration-200;
-}
-.border-dashed:hover {
-  @apply border-blue-400 bg-blue-50;
-}
-
-/* Limite de lignes pour la description */
 .line-clamp-2 {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+.modal-fade-enter-active,
+.modal-fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+.modal-fade-enter-from,
+.modal-fade-leave-to {
+  opacity: 0;
 }
 </style>
